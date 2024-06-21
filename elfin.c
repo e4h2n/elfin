@@ -16,6 +16,8 @@
 
 #define UNUSED(x) (void)(x)
 
+// TODO rewrite scrolling!
+
 enum KEY_PRESS{
   KEY_NULL = 0,       /* NULL */
   TAB = 9,            /* Tab */
@@ -126,15 +128,37 @@ int findBotRow(editor *E, int* extra){ // 0-indexed
   int maxr = getmaxy(stdscr)-1;
   int c = 0;
   int i = E->toprow-1;
-  while(c+1 <= maxr && i < E->numrows-1){
+  while(c < maxr && i < E->numrows-1){
     i++;
     row = E->rowarray[i];
     c += row->len/width + !!(row->len%width);
   }
   if (extra){
-    *extra = c - maxr;
+    *extra = c - maxr; // number of sublines NOT displayed
   }
   return i;
+}
+
+void repositionView(editor *E){ // for scrolling, usually
+  // not keeping track of sublines makes this *really* annoying
+  int width = getmaxx(stdscr) - 5;
+  erow* curr_row = E->rowarray[E->mr];
+
+  int extra; // number of sublines NOT displayed
+  int total = curr_row->len/width; // number of sublines in the current row
+  int at = E->mc/width; // which subline we are at currently
+  int botr = findBotRow(E, &extra);
+
+  extra = max(extra+at - total, min(extra, 0));
+
+  if (E->mr > botr || (E->mr == botr && extra > 0)) {  
+    E->toprow = max(E->toprow, E->toprow + (E->mr - botr) + extra);
+  }
+  else if (E->mr < E->toprow){
+    E->toprow = E->mr;
+  }
+
+  E->toprow = min(E->toprow, E->numrows-1); // safety first!
 }
 
 
@@ -142,48 +166,25 @@ int findBotRow(editor *E, int* extra){ // 0-indexed
  * scrolling, cursor movement, yank/paste */
 Mode View(editor *E, int input){
   if (E->mode != VIEW) return E->mode;
-  
   int width = getmaxx(stdscr) - 5;
-  erow* curr_row = E->rowarray[E->mr];
+  
   if (input == ':'){ // ENTER COMMAND MODE
     return COMMAND;
   } else if (input == 'i'){ // ENTER INSERT MODE
     return INSERT;
-  } else if ((input == DOWN || input == 'j') && (curr_row->len - E->mc > curr_row->len%width || E->mr < E->numrows-1)){ // arrow keys, move cursor
-    if (curr_row->len - E->mc <= curr_row->len%width){
-      E->mr ++;
-      E->mc = E->mc%width;
-    } else {
-      E->mc += width;
-    }
-  } else if ((input == UP || input == 'k') && E->mr >= 0){
-    if (E->mc < width){
-      if (E->mr != 0){
-        E->mr --;
-        erow* dest_row = E->rowarray[E->mr];
-        E->mc = E->mc%width + width*(dest_row->len/width);
-      }
-    } else {
-      E->mc -= width;
-    }
+  } else if ((input == DOWN || input == 'j') && (E->mr < E->numrows-1)){ // arrow keys, move cursor
+    E->mr ++;
+    E->mc = E->mc%width;
+  } else if ((input == UP || input == 'k') && E->mr > 0){
+    E->mr --;
+    E->mc = E->mc%width;
   } else if ((input == LEFT || input == 'h') && E->mc > 0){
     E->mc = min(E->rowarray[E->mr]->len - 1, E->mc - 1);
   } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr]->len-1){
     E->mc ++;
   }
 
-  // SCROLL LOGIC
-  curr_row = E->rowarray[E->mr]; // since cursor has changed pos
-  int extra; // number of sublines NOT displayed
-  int botr = findBotRow(E, &extra);
-  extra -= (curr_row->len - E->mc)/width;
-  if (E->mr > botr || (E->mr == botr && extra > 0)) {  
-    E->toprow ++;
-  }
-  else if (E->mr < E->toprow){
-    E->toprow = E->mr;
-  }
-  E->toprow = min(E->toprow, E->numrows-1); // safety first!
+  repositionView(E);
   return VIEW; // STAY IN VIEW MODE
 }
 
@@ -197,19 +198,19 @@ Mode Insert(editor *E, int input){
   if (input == ESC){
     return VIEW;
 
-  } else if (input == DOWN && E->mr < E->numrows-1){ // arrow keys, move cursor
-    if (curr_row->len - E->mc <= curr_row->len%width){
+  } else if (input == DOWN && E->mr < E->numrows){ // arrow keys, move cursor
+    if (E->mr < E->numrows-1 && curr_row->len - E->mc <= curr_row->len%width){
       E->mr ++;
       E->mr = min(E->mr, E->numrows-1);
       E->mc = E->mc%width;
     } else {
       E->mc += width;
+      E->mc = min(E->mc, curr_row->len);
     }
   } else if (input == UP && E->mr >= 0){
     if (E->mc < width){
       if (E->mr != 0){
         E->mr --;
-        E->mr = max(E->mr, E->toprow);
         erow* dest_row = E->rowarray[E->mr];
         E->mc = E->mc%width + width*(dest_row->len/width);
       }
@@ -250,19 +251,7 @@ Mode Insert(editor *E, int input){
       E->mc ++;
     }
   }
-  // SCROLL LOGIC
-  curr_row = E->rowarray[E->mr]; // since cursor has changed pos
-  int extra; // number of sublines NOT displayed
-  int botr = findBotRow(E, &extra);
-  extra -= (curr_row->len - E->mc)/width;
-  if (E->mr > botr || (E->mr == botr && extra > 0)) {  
-    E->toprow ++;
-  }
-  else if (E->mr < E->toprow){
-    E->toprow = E->mr;
-  }
-  E->toprow = min(E->toprow, E->numrows-1); // safety first!
-
+  repositionView(E);
   return INSERT;
 }
 
