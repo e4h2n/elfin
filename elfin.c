@@ -200,22 +200,21 @@ Mode Insert(editor *E, int input){
 
   } else if (input == DOWN && E->mr < E->numrows){ // arrow keys, move cursor
     if (E->mr < E->numrows-1 && curr_row->len - E->mc <= curr_row->len%width){
-      E->mr ++;
+      E->mr ++; // change line
       E->mr = min(E->mr, E->numrows-1);
       E->mc = E->mc%width;
-    } else {
+    } else { // change subline
       E->mc += width;
       E->mc = min(E->mc, curr_row->len);
     }
   } else if (input == UP && E->mr >= 0){
-    if (E->mc < width){
-      if (E->mr != 0){
-        E->mr --;
-        erow* dest_row = E->rowarray[E->mr];
-        E->mc = E->mc%width + width*(dest_row->len/width);
-      }
-    } else{
+    if (E->mr != 0){
+      E->mr --; // change line
+      erow* dest_row = E->rowarray[E->mr];
+      E->mc = E->mc%width + width*(dest_row->len/width);
+    } else{ // change subline
       E->mc -= width;
+      E->mc = max(E->mc, 0);
     }
   } else if (input == LEFT){
     if (E->mc > 0){
