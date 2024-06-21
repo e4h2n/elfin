@@ -355,14 +355,14 @@ int main(int argc, char *argv[]){
     int dmc = getcurx(stdscr);
 
     if (E->mode == VIEW){
-      sprintf(E->status, "\"%s\" | %d lines | %d botrow | %d, %d", E->filename, E->numrows, findBotRow(E, NULL), E->mr, E->mc); 
+      sprintf(E->status, "\"%s\" | %d lines | %d, %d", E->filename, E->numrows, E->mr+1, E->mc); 
       //sprintf(E->status, "\"%s\" | %p cmd ptr | %d, %d", E->filename, (void*)E->command->cmd, E->mr+1, E->rowarray[E->mr]->len); 
 
       displayStatus(E);
       move(dmr, dmc);
       E->mode = View(E, getch());
     } else if (E->mode == INSERT){
-      sprintf(E->status, " INSERT | %d lines | %d, %d", E->numrows, E->mr, E->mc);
+      sprintf(E->status, " INSERT | %d lines | %d, %d", E->numrows, E->mr+1, E->mc);
 
       displayStatus(E);
       move(dmr, dmc);
