@@ -182,6 +182,8 @@ Mode View(editor *E, int input){
     E->mc = min(E->rowarray[E->mr]->len - 1, E->mc - 1);
   } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr]->len-1){
     E->mc ++;
+  } else if (input == 'd' && getch() == 'd'){
+    deleteRow(E, E->mr);
   }
 
   repositionView(E);
