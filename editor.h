@@ -13,11 +13,12 @@ typedef enum Mode{
 
 typedef struct erow {
   int len; // length of the text, excluding null term
-  char *text; // string content
+  char* text; // string content
+  int* hl; // highlighting information for the text
 } erow;
 
 typedef struct commandrow {
-  erow* cmd; // command string (and lenght)
+  erow* cmd; // command string (and length)
   int mcol; // cursor position
 } commandrow;
 
@@ -30,9 +31,8 @@ typedef struct editor{
 
   /* content info */
   int numrows;
-  erow *rowarray;
-  bool dirty; // file modified?
-  char *filename; // name of currently opened file
+  erow** rowarray;
+  char* filename; // name of currently opened file
 
   commandrow* command; // current user command
 } editor;
@@ -41,10 +41,14 @@ bool insertChar(erow *row, int pos, char c);
 bool deleteChar(erow *row, int pos);
 
 void newRow(editor *E, int rownum);
+
+void freeRow(erow** ptr);
 void deleteRow(editor *E, int rownum);
 
 void splitRow(editor *E, int rownum, int pos);
 void delCatRow(editor *E, int rownum);
+
+void updateRowHL(erow* row, int startHL);
 
 editor *editorFromFile(char *filename);
 void saveToFile(editor *e);

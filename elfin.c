@@ -5,7 +5,6 @@
 #include <math.h>
 
 #include <ncurses.h>
-#include <regex.h>
 #include "editor.h"
 
 #define DEFAULT_PAIR 1
@@ -27,12 +26,14 @@ enum KEY_PRESS{
   UP = 259,           /* Up Arrow */
   LEFT = 260,         /* Left Arrow */
   RIGHT = 261,        /* Right Arrow */
+  PGD = 9999,         /* Page Down */
+  PGU = 99999,        /* Page Up */
 };
 
 /* debug tool */
 void printRows(editor *E){
   for(int i = 0; i < E->numrows; i++){
-    printf("%2d: %s\n", i, E->rowarray[i].text);
+    printf("%2d: %s\n", i, E->rowarray[i]->text);
   }
   printf("\n");
 }
@@ -63,25 +64,50 @@ int max(int a, int b){
 
 /* PRINT the editor */
 void displayEditor(editor *E){
-  int maxr = getmaxy(stdscr);
+  int maxr = getmaxy(stdscr)-1;
+  int maxc = getmaxx(stdscr);
+  int width = maxc - 5;
   erow* currrow;
+  int currln = 0;
 
-  for (int i = 0; i < maxr - 1; i++){
-    move(i, 0);
+  int dr = 0;
+  int dc = 1;
+
+  for (int i = 0; ; i++){
+    if (currln > maxr){
+      break;
+    }
+    move(currln, 0);
     clrtoeol();
 
     if(i+E->toprow < E->numrows){
-      currrow = E->rowarray+i+E->toprow;
+      currrow = E->rowarray[i+E->toprow];
 
       attron(COLOR_PAIR(LINENUMBER_PAIR));
       printw("%4d ", i+E->toprow+1);
       attroff(COLOR_PAIR(LINENUMBER_PAIR));
-
-      colorPrint(currrow->text, currrow->len, DEFAULT_PAIR);
+      
+      int sublines = (currrow->len)/width + !!((currrow->len)%width);
+      for (int j = 0; j < sublines && currln <= maxr; j++){
+        if (i+E->toprow == E->mr && j == E->mc/width){
+          dr = currln;
+          dc = E->mc%width;
+          dc = min(dc, currrow->len-1 - j*width);
+        }
+        if (j){
+          move(currln, 0);
+          clrtoeol();
+        }
+        move(currln, 5);
+        colorPrint(currrow->text + j*width, width, DEFAULT_PAIR);
+        currln++;
+      }
     } else {
-      colorPrint("~", 1, DEFAULT_PAIR);
+      currln ++;
+      colorPrint("~", 1, LINENUMBER_PAIR);
     }
   }
+  move(dr, dc+5);
 }
 
 /* PRINT the status */
@@ -94,48 +120,70 @@ void displayStatus(editor *E){
   attroff(COLOR_PAIR(DEFAULT_PAIR));
 }
 
+int findBotRow(editor *E, int* extra){ // 0-indexed
+  int width = getmaxx(stdscr) - 6;
+  erow* row;
+  int maxr = getmaxy(stdscr)-1;
+  int c = 0;
+  int i = E->toprow-1;
+  while(c+1 <= maxr && i < E->numrows-1){
+    i++;
+    row = E->rowarray[i];
+    c += row->len/width + !!(row->len%width);
+  }
+  if (extra){
+    *extra = c - maxr;
+  }
+  return i;
+}
+
+
 /* VIEW MODE *
  * scrolling, cursor movement, yank/paste */
 Mode View(editor *E, int input){
   if (E->mode != VIEW) return E->mode;
-  int s = 0; // 0(default): page scroll; 1: cursor scroll
-             //strcpy(E->status, E->filename);
+  
+  int width = getmaxx(stdscr) - 5;
+  erow* curr_row = E->rowarray[E->mr];
   if (input == ':'){ // ENTER COMMAND MODE
     return COMMAND;
   } else if (input == 'i'){ // ENTER INSERT MODE
     return INSERT;
-  } else if(input == 'k' && E->toprow > 0){ // scroll page up
-    E->toprow --;
-  } else if (input == 'j' && E->toprow < E->numrows-1){ // scroll page down
-    E->toprow ++;
-  } else if (input == DOWN && E->mr < E->numrows-1){ // arrow keys, move cursor
-    E->mr ++;
-    s = 1;
-  } else if (input == UP && E->mr > 0){
-    E->mr --;
-    s = 1;
+  } else if ((input == DOWN || input == 'j') && (curr_row->len - E->mc > curr_row->len%width || E->mr < E->numrows-1)){ // arrow keys, move cursor
+    if (curr_row->len - E->mc <= curr_row->len%width){
+      E->mr ++;
+      E->mc = E->mc%width;
+    } else {
+      E->mc += width;
+    }
+  } else if ((input == UP || input == 'k') && E->mr >= 0){
+    if (E->mc < width){
+      if (E->mr != 0){
+        E->mr --;
+        erow* dest_row = E->rowarray[E->mr];
+        E->mc = E->mc%width + width*(dest_row->len/width);
+      }
+    } else {
+      E->mc -= width;
+    }
   } else if ((input == LEFT || input == 'h') && E->mc > 0){
-    E->mc --;
-  } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr].len-1){
+    E->mc = min(E->rowarray[E->mr]->len - 1, E->mc - 1);
+  } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr]->len-1){
     E->mc ++;
   }
 
   // SCROLL LOGIC
-  int maxr = getmaxy(stdscr);
-  if (E->mr < E->toprow){
-    if (s){ // cursor moved, scroll the page
-      E->toprow = E->mr;
-    } else { // page moved, move the cursor
-      E->mr = E->toprow;
-    }
+  curr_row = E->rowarray[E->mr]; // since cursor has changed pos
+  int extra; // number of sublines NOT displayed
+  int botr = findBotRow(E, &extra);
+  extra -= (curr_row->len - E->mc)/width;
+  if (E->mr > botr || (E->mr == botr && extra > 0)) {  
+    E->toprow ++;
   }
-  else if (E->mr > E->toprow+maxr-2){
-    if (s){ // cursor moved, scroll the page
-      E->toprow = E->mr - maxr + 2;
-    } else { // page moved, move the cursor
-      E->mr = E->toprow + maxr - 2;
-    }
+  else if (E->mr < E->toprow){
+    E->toprow = E->mr;
   }
+  E->toprow = min(E->toprow, E->numrows-1); // safety first!
   return VIEW; // STAY IN VIEW MODE
 }
 
@@ -143,26 +191,37 @@ Mode View(editor *E, int input){
  * typing, cursor movement, deletion */
 Mode Insert(editor *E, int input){
   if (E->mode != INSERT) return E->mode;
-  erow *currrow = E->rowarray+ E->mr;
+  int width = getmaxx(stdscr) - 5;
+  erow *curr_row = E->rowarray[E->mr];
 
   if (input == ESC){
     return VIEW;
 
-  } else if (input == DOWN){
-    if (E->mr < E->numrows-1){
+  } else if (input == DOWN && E->mr < E->numrows-1){ // arrow keys, move cursor
+    if (curr_row->len - E->mc <= curr_row->len%width){
       E->mr ++;
+      E->mr = min(E->mr, E->numrows-1);
+      E->mc = E->mc%width;
+    } else {
+      E->mc += width;
     }
-
-  } else if (input == UP){
-    if (E->mr > 0){
-      E->mr --;
+  } else if (input == UP && E->mr >= 0){
+    if (E->mc < width){
+      if (E->mr != 0){
+        E->mr --;
+        E->mr = max(E->mr, E->toprow);
+        erow* dest_row = E->rowarray[E->mr];
+        E->mc = E->mc%width + width*(dest_row->len/width);
+      }
+    } else{
+      E->mc -= width;
     }
   } else if (input == LEFT){
     if (E->mc > 0){
       E->mc --;
     }
   } else if (input == RIGHT){
-    if (E->mc < E->rowarray[E->mr].len-1){
+    if (E->mc < E->rowarray[E->mr]->len-1){
       E->mc ++;
     }
 
@@ -173,32 +232,36 @@ Mode Insert(editor *E, int input){
 
   } else if (input == BACKSPACE || input == DEL){
     if (E->mc == 0 && E->mr > 0){
-      E->mc = E->rowarray[E->mr-1].len - 1;
+      E->mc = E->rowarray[E->mr-1]->len - 1;
       delCatRow(E, E->mr);
       E->mr --;
     }
-    else if (deleteChar(currrow, E->mc-1)){
+    else if (deleteChar(curr_row, E->mc-1)){
       E->mc --;
     }
 
   } else if (input == TAB){
-    insertChar(currrow, E->mc, ' ');
-    insertChar(currrow, E->mc, ' ');
+    insertChar(curr_row, E->mc, ' ');
+    insertChar(curr_row, E->mc, ' ');
     E->mc += 2;
 
   } else {
-    if (insertChar(currrow, E->mc, input)){
+    if (insertChar(curr_row, E->mc, input)){
       E->mc ++;
     }
   }
-  // SCROLL LOGIC (cursor only)
-  int maxr = getmaxy(stdscr);
-  if (E->mr < E->toprow){
+  // SCROLL LOGIC
+  curr_row = E->rowarray[E->mr]; // since cursor has changed pos
+  int extra; // number of sublines NOT displayed
+  int botr = findBotRow(E, &extra);
+  extra -= (curr_row->len - E->mc)/width;
+  if (E->mr > botr || (E->mr == botr && extra > 0)) {  
+    E->toprow ++;
+  }
+  else if (E->mr < E->toprow){
     E->toprow = E->mr;
   }
-  else if (E->mr > E->toprow+maxr-2){
-    E->toprow = E->mr - maxr + 2;
-  }
+  E->toprow = min(E->toprow, E->numrows-1); // safety first!
 
   return INSERT;
 }
@@ -222,7 +285,15 @@ Mode Command(editor* E, int input){
 
   } else if (input == '\n'){
     // TODO
-    if (!strcmp(currrow->text, "q")){
+    if (!strcmp(currrow->text, "c")){
+      for (int i = E->numrows-1; i >= 0; i--){
+        deleteRow(E, i);
+        E->mr = 0;
+        E->mc = 1;
+        E->toprow = 0;
+      }
+    }
+    else if (!strcmp(currrow->text, "q")){
       return QUIT;
     } else if (!strcmp(currrow->text, "w")){
       saveToFile(E);
@@ -230,7 +301,12 @@ Mode Command(editor* E, int input){
       saveToFile(E);
       return QUIT;
     }
-    //C->mcol = 0;
+
+    // clear out the command line
+    free(currrow->text);
+    currrow->text = strdup("");
+    currrow->len = 0;
+    C->mcol = 0;
     return VIEW;
 
   } else if (input == BACKSPACE || input == DEL){
@@ -268,40 +344,29 @@ int main(int argc, char *argv[]){
   init_pair(LINENUMBER_PAIR, COLOR_RED, -1);
 
   editor *E = editorFromFile(argv[1]);
-  //strcpy(E->status, E->filename);
-  //editor *E = calloc(sizeof(editor), 1);
-  E->mode = VIEW;
 
-  //newRow(E, 7);
-  //newRow(E, 4);
-  //displayEditor(E);
-  //getch();
+  E->mode = VIEW;
+  E->mr = 0;
+  E->mc = 1;
 
   while(1){
     displayEditor(E);
-    //int maxc = getmaxx(stdscr);
+    int dmr = getcury(stdscr);
+    int dmc = getcurx(stdscr);
+
     if (E->mode == VIEW){
-      sprintf(E->status, "\"%s\" | %d lines | %d, %d", E->filename, E->numrows, E->mr+1, E->mc); 
+      sprintf(E->status, "\"%s\" | %d lines | %d botrow | %d, %d", E->filename, E->numrows, findBotRow(E, NULL), E->mr, E->mc); 
+      //sprintf(E->status, "\"%s\" | %p cmd ptr | %d, %d", E->filename, (void*)E->command->cmd, E->mr+1, E->rowarray[E->mr]->len); 
+
       displayStatus(E);
-
-      int dmr = max(0, min(E->mr, E->numrows-1)) - E->toprow;
-
-      int dmc = E->mc + 5;
-      int rowlen = E->rowarray[dmr + E->toprow].len-1 + 5;
-      dmc = dmc < rowlen ? dmc : rowlen; // TODO CLEAN THIS UP
-
       move(dmr, dmc);
-      E->mode = View(E, getch()); // consider moving the getch()
+      E->mode = View(E, getch());
     } else if (E->mode == INSERT){
-      sprintf(E->status, " INSERT | %d lines | %d, %d", E->numrows, E->mr+1, E->mc); 
+      sprintf(E->status, " INSERT | %d lines | %d, %d", E->numrows, E->mr, E->mc);
+
       displayStatus(E);
-
-      int dmr = max(0, min(E->mr, E->numrows-1)) - E->toprow;
-
-      E->mc = max(0, min(E->rowarray[E->mr].len-1, E->mc));
-      int dmc = 5+E->mc;
-
       move(dmr, dmc);
+      E->mc = min(E->mc, E->rowarray[E->mr]->len-1); // make sure we are in bounds
       E->mode = Insert(E, getch());
     } else if (E->mode == COMMAND){
       int maxr = getmaxy(stdscr) -1;
