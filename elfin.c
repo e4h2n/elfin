@@ -64,47 +64,51 @@ int max(int a, int b){
   }
 }
 
-/* PRINT the editor */
+/* PRINTS the editor *
+ * MOVES cursor to correct position based on E->mr, E->mc */
 void displayEditor(editor *E){
   int maxr = getmaxy(stdscr)-1;
-  int maxc = getmaxx(stdscr);
-  int width = maxc - 5;
-  erow* currrow;
-  int currln = 0;
+  int width = getmaxx(stdscr) - 5;
 
-  int dr = 0;
-  int dc = 1;
+  erow* curr_row;
+  int currln = 0; // VISUAL line
 
-  for (int i = 0; ; i++){
-    if (currln > maxr){
-      break;
-    }
+  // for cursor position
+  int dr = -1; // -1 means not yet found
+  int dc; // uninitialized so it will crash if something goes wrong :D
+  
+  // iterate over the rows, starting at toprow
+  for (int curr_row_number = E->toprow; currln <= maxr; curr_row_number++){
     move(currln, 0);
     clrtoeol();
 
-    if(i+E->toprow < E->numrows){
-      currrow = E->rowarray[i+E->toprow];
+    if(curr_row_number < E->numrows){ // valid line
+      curr_row = E->rowarray[curr_row_number];
 
       attron(COLOR_PAIR(LINENUMBER_PAIR));
-      printw("%4d ", i+E->toprow+1);
+      printw("%4d ", curr_row_number + 1);
       attroff(COLOR_PAIR(LINENUMBER_PAIR));
       
-      int sublines = (currrow->len)/width + !!((currrow->len)%width);
+      int sublines = (curr_row->len)/width + !!((curr_row->len)%width); // ceil division
       for (int j = 0; j < sublines && currln <= maxr; j++){
-        if (i+E->toprow == E->mr && j == E->mc/width){
+        // cursor finding
+        // default to last subrow, rightmost col
+        if (dr < 0 && curr_row_number == E->mr && (j == E->mc/width || j == sublines-1)){
           dr = currln;
-          dc = E->mc%width;
-          dc = min(dc, currrow->len-1 - j*width);
+          dc = min(E->mc, curr_row->len-1);
+          dc %= width;
         }
-        if (j){
+
+        if (j){ // this means we are in a subline, clear any line number previously printed
           move(currln, 0);
           clrtoeol();
         }
+        // print subrow contents
         move(currln, 5);
-        colorPrint(currrow->text + j*width, width, DEFAULT_PAIR);
+        colorPrint(curr_row->text + j*width, width, DEFAULT_PAIR);
         currln++;
       }
-    } else {
+    } else { // past the end of the file
       currln ++;
       colorPrint("~", 1, LINENUMBER_PAIR);
     }
@@ -114,8 +118,8 @@ void displayEditor(editor *E){
 
 /* PRINT the status */
 void displayStatus(editor *E){
-  int maxr = getmaxy(stdscr);
-  move(maxr-1,0);
+  int maxr = getmaxy(stdscr) - 1;
+  move(maxr,0);
   clrtoeol();
   attron(COLOR_PAIR(DEFAULT_PAIR));
   printw("%s", E->status);
@@ -123,18 +127,18 @@ void displayStatus(editor *E){
 }
 
 int findBotRow(editor *E, int* extra){ // 0-indexed
-  int width = getmaxx(stdscr) - 6;
+  int width = getmaxx(stdscr) - 5;
   erow* row;
-  int maxr = getmaxy(stdscr)-1;
-  int c = 0;
+  int maxr = getmaxy(stdscr)-1; // VISUAL rows
+  int visualr = 0; // COUNTING visual rows needed to display editor
   int i = E->toprow-1;
-  while(c < maxr && i < E->numrows-1){
+  while(visualr < maxr && i < E->numrows-1){
     i++;
     row = E->rowarray[i];
-    c += row->len/width + !!(row->len%width);
+    visualr += row->len/width + !!(row->len%width);
   }
   if (extra){
-    *extra = c - maxr; // number of sublines NOT displayed
+    *extra = visualr - maxr; // number of sublines NOT displayed
   }
   return i;
 }
@@ -149,7 +153,7 @@ void repositionView(editor *E){ // for scrolling, usually
   int at = E->mc/width; // which subline we are at currently
   int botr = findBotRow(E, &extra);
 
-  extra = max(extra+at - total, min(extra, 0));
+  extra = max(extra+at - total, 0);
 
   if (E->mr > botr || (E->mr == botr && extra > 0)) {  
     E->toprow = max(E->toprow, E->toprow + (E->mr - botr) + extra);
@@ -166,24 +170,24 @@ void repositionView(editor *E){ // for scrolling, usually
  * scrolling, cursor movement, yank/paste */
 Mode View(editor *E, int input){
   if (E->mode != VIEW) return E->mode;
-  int width = getmaxx(stdscr) - 5;
   
   if (input == ':'){ // ENTER COMMAND MODE
     return COMMAND;
   } else if (input == 'i'){ // ENTER INSERT MODE
     return INSERT;
-  } else if ((input == DOWN || input == 'j') && (E->mr < E->numrows-1)){ // arrow keys, move cursor
-    E->mr ++;
-    E->mc = E->mc%width;
-  } else if ((input == UP || input == 'k') && E->mr > 0){
-    E->mr --;
-    E->mc = E->mc%width;
+  } else if ((input == DOWN || input == 'j')){ // arrow keys, move cursor
+    E->toprow += (E->mr == E->numrows-1); // CAN EXCEED NUMLINES, caught in repositionView
+    E->mr = min(E->numrows-1, E->mr+1);
+
+  } else if ((input == UP || input == 'k')){
+    E->mr = max(0, E->mr-1);
   } else if ((input == LEFT || input == 'h') && E->mc > 0){
     E->mc = min(E->rowarray[E->mr]->len - 1, E->mc - 1);
   } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr]->len-1){
     E->mc ++;
   } else if (input == 'd' && getch() == 'd'){
     deleteRow(E, E->mr);
+    E->mr = min(E->mr, E->numrows-1);
   }
 
   repositionView(E);
@@ -195,28 +199,29 @@ Mode View(editor *E, int input){
 Mode Insert(editor *E, int input){
   if (E->mode != INSERT) return E->mode;
   int width = getmaxx(stdscr) - 5;
-  erow *curr_row = E->rowarray[E->mr];
+  erow* curr_row = E->rowarray[E->mr];
 
   if (input == ESC){
     return VIEW;
 
-  } else if (input == DOWN && E->mr < E->numrows){ // arrow keys, move cursor
-    if (E->mr < E->numrows-1 && curr_row->len - E->mc <= curr_row->len%width){
-      E->mr ++; // change line
-      E->mr = min(E->mr, E->numrows-1);
-      E->mc = E->mc%width;
+  } else if (input == DOWN){
+    if (curr_row->len - E->mc <= curr_row->len%width){ // change line
+      if (E->mr == E->numrows-1){ // at bottom
+        E->toprow ++;
+      } else{
+        E->mr ++;
+        E->mc %= width;
+      }
     } else { // change subline
-      E->mc += width;
-      E->mc = min(E->mc, curr_row->len);
+      E->mc = min(E->mc + width, curr_row->len);
     }
-  } else if (input == UP && E->mr >= 0){
-    if (E->mr != 0){
+  } else if (input == UP){
+    if (E->mr > 0 && E->mc < width){
       E->mr --; // change line
       erow* dest_row = E->rowarray[E->mr];
       E->mc = E->mc%width + width*(dest_row->len/width);
     } else{ // change subline
-      E->mc -= width;
-      E->mc = max(E->mc, 0);
+      E->mc = max(E->mc - width, 0);
     }
   } else if (input == LEFT){
     if (E->mc > 0){
@@ -274,7 +279,6 @@ Mode Command(editor* E, int input){
     }
 
   } else if (input == '\n'){
-    // TODO
     if (!strcmp(currrow->text, "c")){
       for (int i = E->numrows-1; i >= 0; i--){
         deleteRow(E, i);
@@ -367,6 +371,7 @@ int main(int argc, char *argv[]){
 
       E->mode = Command(E, getch());
     } else if (E->mode == QUIT){
+      // TODO delete/free the editor
       break;
     }
   }
