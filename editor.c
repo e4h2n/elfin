@@ -70,7 +70,7 @@ void freeRow(erow** ptr){
   free(row->text);
   free(row->hl);
   free(row);
-  ptr = NULL;
+  *ptr = NULL;
 }
 
 /* deletes the specified row from the editor, shifting rows below it up by one */
@@ -204,7 +204,7 @@ void deleteEditor(editor** ptr){
   while(E->numrows > 1){
     deleteRow(E, 0);
   }
-  freeRow(E->rowarray);
+  freeRow(&E->rowarray[0]); // free 0th row
   free(E->rowarray);
   free(E->filename);
 
@@ -212,7 +212,7 @@ void deleteEditor(editor** ptr){
   commandrow* C = E->command;
   freeRow(&(C->cmd));
   free(C);
-  free(E);
-  ptr = NULL;
-}
 
+  free(E);
+  *ptr = NULL;
+}
