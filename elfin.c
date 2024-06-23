@@ -28,6 +28,7 @@ enum KEY_PRESS{
   UP = 259,           /* Up Arrow */
   LEFT = 260,         /* Left Arrow */
   RIGHT = 261,        /* Right Arrow */
+  // TODO
   PGD = 9999,         /* Page Down */
   PGU = 99999,        /* Page Up */
 };
@@ -126,6 +127,8 @@ void displayStatus(editor *E){
   attroff(COLOR_PAIR(DEFAULT_PAIR));
 }
 
+/* returns the number of the lowest (greatest number) row in view *
+ * sets extra to the number of sublines out of view */
 int findBotRow(editor *E, int* extra){ // 0-indexed
   int width = getmaxx(stdscr) - 5;
   erow* row;
@@ -138,27 +141,38 @@ int findBotRow(editor *E, int* extra){ // 0-indexed
     visualr += row->len/width + !!(row->len%width);
   }
   if (extra){
-    *extra = visualr - maxr; // number of sublines NOT displayed
+    *extra = max(visualr - maxr, 0); // number of sublines NOT displayed
   }
   return i;
 }
 
+/* modifies topline to ensure the cursor is on the screen */
 void repositionView(editor *E){ // for scrolling, usually
   // not keeping track of sublines makes this *really* annoying
   int width = getmaxx(stdscr) - 5;
   erow* curr_row = E->rowarray[E->mr];
+  erow* top_row = E->rowarray[E->toprow];
 
   int extra; // number of sublines NOT displayed
   int total = curr_row->len/width; // number of sublines in the current row
-  int at = E->mc/width; // which subline we are at currently
+  int at = min(E->mc, curr_row->len)/width; // which subline we are at currently
   int botr = findBotRow(E, &extra);
 
-  extra = max(extra+at - total, 0);
-
-  if (E->mr > botr || (E->mr == botr && extra > 0)) {  
-    E->toprow = max(E->toprow, E->toprow + (E->mr - botr) + extra);
+  while(E->mr > botr) { // cursor past bottom row
+    E->toprow++;
+    botr = findBotRow(E, &extra);
   }
-  else if (E->mr < E->toprow){
+
+  extra = at - (total - extra); // how many sublines we need to reposition by
+  while(E->mr == botr && extra > 0) { // cursor on bottom row, on a subline out of view
+    E->toprow ++;
+    extra -= (top_row->len/width + !!(top_row->len%width));
+
+    top_row = E->rowarray[E->toprow];
+    botr = findBotRow(E, NULL);
+  }
+
+  if (E->mr < E->toprow){
     E->toprow = E->mr;
   }
 
@@ -313,6 +327,9 @@ Mode Command(editor* E, int input){
     insertChar(currrow, C->mcol, ' ');
     C->mcol += 2;
 
+  } else if (input == ESC){
+    return VIEW;
+
   } else {
     if (insertChar(currrow, C->mcol, input)){
       C->mcol ++;
@@ -345,7 +362,7 @@ int main(int argc, char *argv[]){
 
   while(1){
     displayEditor(E);
-    int dmr = getcury(stdscr);
+    int dmr = getcury(stdscr); // yeah this is a little awkward
     int dmc = getcurx(stdscr);
 
     if (E->mode == VIEW){
@@ -372,6 +389,7 @@ int main(int argc, char *argv[]){
       E->mode = Command(E, getch());
     } else if (E->mode == QUIT){
       // TODO delete/free the editor
+      deleteEditor(&E);
       break;
     }
   }

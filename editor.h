@@ -52,3 +52,5 @@ void updateRowHL(erow* row, int startHL);
 
 editor *editorFromFile(char *filename);
 void saveToFile(editor *e);
+
+void deleteEditor(editor** ptr);

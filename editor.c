@@ -46,13 +46,13 @@ void newRow(editor *E, int rownum){
       E->rowarray[i] = malloc(sizeof(erow));
       E->rowarray[i]->len = 0;
       E->rowarray[i]->text = strdup("");
-      E->rowarray[i]->hl = malloc(sizeof(int));;
+      E->rowarray[i]->hl = malloc(sizeof(int));
     }
     E->numrows = rownum + 1;
   }
   else{
     /* insert one new row in the middle of the editor's rows */
-    E->rowarray = realloc(E->rowarray, (E->numrows +1)*sizeof(erow*));
+    E->rowarray = realloc(E->rowarray, (E->numrows+1)*sizeof(erow*));
     int rowshift = E->numrows - rownum;
 
     memmove(E->rowarray + rownum+1, E->rowarray + rownum,sizeof(erow*)*rowshift);
@@ -106,7 +106,10 @@ void splitRow(editor *E, int rownum, int pos){
   erow *newrow = E->rowarray[rownum + 1];
   
   newrow->len = currrow->len - pos;
+
+  free(newrow->text);
   newrow->text = strdup(currrow->text + pos);
+
   currrow->len = pos+1;
   currrow->text[pos] = '\0';
   currrow->text = realloc(currrow->text, currrow->len);
@@ -127,6 +130,7 @@ void delCatRow(editor *E, int rownum){
 
 /* updates the HL string of a row              *
  * requires a start state (multiline comments) */
+// TODO
 void updateRowHL(erow* row, int startHL){
   //realloc(row->hl, row->len);
   //iterate through the line, setting each entry
@@ -183,14 +187,32 @@ editor* editorFromFile(char* filename){
   return E;
 }
 
-void saveToFile(editor* e){
-  FILE* fp = fopen(e->filename, "w");
+void saveToFile(editor* E){
+  FILE* fp = fopen(E->filename, "w");
   if (!fp){
     return;
   }
 
-  for(int i = 0; i < e->numrows; i++){
-    fprintf(fp, "%s\n", e->rowarray[i]->text);
+  for(int i = 0; i < E->numrows; i++){
+    fprintf(fp, "%s\n", E->rowarray[i]->text);
   }
+}
+
+void deleteEditor(editor** ptr){
+  editor* E = *ptr;
+  // delete all rows
+  while(E->numrows > 1){
+    deleteRow(E, 0);
+  }
+  freeRow(E->rowarray);
+  free(E->rowarray);
+  free(E->filename);
+
+  // command row
+  commandrow* C = E->command;
+  freeRow(&(C->cmd));
+  free(C);
+  free(E);
+  ptr = NULL;
 }
 
