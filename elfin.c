@@ -13,10 +13,9 @@
 #define PURP_PAIR 4
 #define BLUE_PAIR 5
 #define TAN_PAIR 6
+#define INV_PAIR 7
 
 #define UNUSED(x) (void)(x)
-
-// TODO rewrite scrolling!
 
 enum KEY_PRESS{
   KEY_NULL = 0,       /* NULL */
@@ -122,9 +121,7 @@ void displayStatus(editor *E){
   int maxr = getmaxy(stdscr) - 1;
   move(maxr,0);
   clrtoeol();
-  attron(COLOR_PAIR(DEFAULT_PAIR));
-  printw("%s", E->status);
-  attroff(COLOR_PAIR(DEFAULT_PAIR));
+  colorPrint(E->status, 80, DEFAULT_PAIR);
 }
 
 /* returns the number of the lowest (greatest number) row in view *
@@ -179,13 +176,82 @@ void repositionView(editor *E){ // for scrolling, usually
   E->toprow = min(E->toprow, E->numrows-1); // safety first!
 }
 
+/* COMMAND MODE *
+ * save, quit, search, clear */
+Mode Command(editor* E, int input){
+  commandrow* C = E->command;
+  erow* curr_row = C->cmd;
+
+  if (input == LEFT){
+    if (C->mcol > 0){
+      C->mcol --;
+    }
+  } else if (input == RIGHT){
+    if (C->mcol < C->cmd->len-1){
+      C->mcol ++;
+    }
+
+  } else if (input == '\n'){
+    if (!strcmp(curr_row->text, "c")){
+      for (int i = E->numrows-1; i >= 0; i--){
+        deleteRow(E, i);
+        E->mr = 0;
+        E->mc = 1;
+        E->toprow = 0;
+      }
+    }
+    else if (!strcmp(curr_row->text, "q")){
+      return QUIT;
+    } else if (!strcmp(curr_row->text, "w")){
+      saveToFile(E);
+    } else if (!strcmp(curr_row->text, "wq")){
+      saveToFile(E);
+      return QUIT;
+    } else if (!strncmp(curr_row->text, "f ", 2) && curr_row->len > 2){
+      findNext(E, &E->mr, &E->mc, curr_row->text + 2);
+      return VIEW;
+    }
+    return VIEW;
+
+  } else if (input == BACKSPACE || input == DEL){
+    if (C->mcol <= 0){
+      return VIEW;
+    }
+    else if (deleteChar(curr_row, C->mcol-1)){
+      C->mcol --;
+    }
+
+  } else if (input == TAB){
+    insertChar(curr_row, C->mcol, ' ');
+    insertChar(curr_row, C->mcol, ' ');
+    C->mcol += 2;
+
+  } else if (input == ESC){
+    return VIEW;
+
+  } else {
+    if (insertChar(curr_row, C->mcol, input)){
+      C->mcol ++;
+    }
+  }
+  return COMMAND;
+}
 
 /* VIEW MODE *
  * scrolling, cursor movement, yank/paste */
 Mode View(editor *E, int input){
   if (E->mode != VIEW) return E->mode;
   
-  if (input == ':'){ // ENTER COMMAND MODE
+  if (input == ':'){ // ENTER COMMAND MODE    
+    // clear out the command line first
+    commandrow* C = E->command;
+    erow* curr_row = C->cmd;
+    if (curr_row->len != 0){
+      free(curr_row->text);
+      curr_row->text = strdup("");
+      curr_row->len = 0;
+      C->mcol = 0;
+    }
     return COMMAND;
   } else if (input == 'i'){ // ENTER INSERT MODE
     return INSERT;
@@ -202,9 +268,10 @@ Mode View(editor *E, int input){
   } else if (input == 'd' && getch() == 'd'){
     deleteRow(E, E->mr);
     E->mr = min(E->mr, E->numrows-1);
+  }  else if (input == '.'){
+    return Command(E, '\n');
   }
 
-  repositionView(E);
   return VIEW; // STAY IN VIEW MODE
 }
 
@@ -271,71 +338,7 @@ Mode Insert(editor *E, int input){
       E->mc ++;
     }
   }
-  repositionView(E);
   return INSERT;
-}
-
-/* COMMAND MODE *
- * save, quit, search(eventually :P) */
-Mode Command(editor* E, int input){
-  if (E->mode != COMMAND) return E->mode;
-
-  commandrow* C = E->command;
-  erow* currrow = C->cmd;
-
-  if (input == LEFT){
-    if (C->mcol > 0){
-      C->mcol --;
-    }
-  } else if (input == RIGHT){
-    if (C->mcol < C->cmd->len-1){
-      C->mcol ++;
-    }
-
-  } else if (input == '\n'){
-    if (!strcmp(currrow->text, "c")){
-      for (int i = E->numrows-1; i >= 0; i--){
-        deleteRow(E, i);
-        E->mr = 0;
-        E->mc = 1;
-        E->toprow = 0;
-      }
-    }
-    else if (!strcmp(currrow->text, "q")){
-      return QUIT;
-    } else if (!strcmp(currrow->text, "w")){
-      saveToFile(E);
-    } else if (!strcmp(currrow->text, "wq")){
-      saveToFile(E);
-      return QUIT;
-    }
-
-    // clear out the command line
-    free(currrow->text);
-    currrow->text = strdup("");
-    currrow->len = 0;
-    C->mcol = 0;
-    return VIEW;
-
-  } else if (input == BACKSPACE || input == DEL){
-    if (C->mcol > 0 && deleteChar(currrow, C->mcol-1)){
-      C->mcol --;
-    }
-
-  } else if (input == TAB){
-    insertChar(currrow, C->mcol, ' ');
-    insertChar(currrow, C->mcol, ' ');
-    C->mcol += 2;
-
-  } else if (input == ESC){
-    return VIEW;
-
-  } else {
-    if (insertChar(currrow, C->mcol, input)){
-      C->mcol ++;
-    }
-  }
-  return COMMAND;
 }
 
 int main(int argc, char *argv[]){
@@ -352,7 +355,8 @@ int main(int argc, char *argv[]){
   use_default_colors();
   
   init_pair(DEFAULT_PAIR, COLOR_WHITE, -1);
-  init_pair(LINENUMBER_PAIR, COLOR_RED, -1);
+  init_pair(LINENUMBER_PAIR, COLOR_YELLOW, -1);
+  init_pair(INV_PAIR, COLOR_BLACK, COLOR_WHITE);
 
   editor *E = editorFromFile(argv[1]);
 
@@ -361,11 +365,13 @@ int main(int argc, char *argv[]){
   E->mc = 1;
 
   while(1){
+    repositionView(E);
     displayEditor(E);
     int dmr = getcury(stdscr); // yeah this is a little awkward
     int dmc = getcurx(stdscr);
 
     if (E->mode == VIEW){
+      //sprintf(E->status, "%s", E->command->cmd->text);
       sprintf(E->status, "\"%s\" | %d lines | %d, %d", E->filename, E->numrows, E->mr+1, E->mc); 
       //sprintf(E->status, "\"%s\" | %p cmd ptr | %d, %d", E->filename, (void*)E->command->cmd, E->mr+1, E->rowarray[E->mr]->len); 
 
@@ -383,7 +389,8 @@ int main(int argc, char *argv[]){
       int maxr = getmaxy(stdscr) -1;
       move(maxr, 0);
       clrtoeol();
-      printw(":%s", E->command->cmd->text);
+      colorPrint(":", 1, DEFAULT_PAIR);
+      colorPrint(E->command->cmd->text, E->command->cmd->len, DEFAULT_PAIR);
       move(maxr, E->command->mcol+1);
 
       E->mode = Command(E, getch());

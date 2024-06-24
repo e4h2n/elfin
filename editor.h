@@ -1,6 +1,6 @@
 /* API for a simple text editor *
  * by Eshan Bajwa (eshanbajwa@gmail.com) *
- * heavily based on 'kilo' by Salatore Sanfilippo (antirez@gmail.com) *
+ * based on 'kilo' by Salatore Sanfilippo (antirez@gmail.com) *
  * and the associated snaptoken tutorial by Paige Ruten (paige.ruten@gmail.com) */
 #pragma once
 
@@ -47,6 +47,8 @@ void deleteRow(editor *E, int rownum);
 
 void splitRow(editor *E, int rownum, int pos);
 void delCatRow(editor *E, int rownum);
+
+int findNext(editor* E, int* r, int* c, char* target);
 
 void updateRowHL(erow* row, int startHL);
 

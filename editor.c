@@ -1,6 +1,7 @@
 /* API for a simple text editor *
  * personal project by Eshan Bajwa (eshanbajwa@gmail.com) *
- * heavily based on 'kilo' and the associated snaptoken tutorial by Salatore Sanfilippo (antirez@gmail.com) */
+ * based on 'kilo' by Salatore Sanfilippo (antirez@gmail.com) *
+ * and the associated snaptoken tutorial by Paige Ruten (paige.ruten@gmail.com) */
 
 #include <stdlib.h>
 #include <string.h>
@@ -126,6 +127,30 @@ void delCatRow(editor *E, int rownum){
   top_row->len = top_row->len + bot_row->len - 1;
   strcat(top_row->text, bot_row->text);
   deleteRow(E, rownum);
+}
+
+/* finds the next occurance of a string starting from r, c in the file*
+ * sets r, c to the coordinate of the first char in the string, if found *
+ * returns 0 if no match, 1 if there is a match */
+int findNext(editor *E, int* r, int* c, char* needle){
+  if (!r || !c) return 0;
+  
+  char* haystack;
+  char* occurs;
+  for(int i = *r; i < E->numrows; i++){
+    if (i == *r){ // first iteration, start at col
+      haystack = E->rowarray[i]->text + *c + 1;
+    } else{
+      haystack = E->rowarray[i]->text;
+    }
+
+    if ((occurs = strnstr(haystack, needle, E->rowarray[i]->len))){
+      *r = i;
+      *c = occurs - E->rowarray[i]->text;
+      return 1;
+    }
+  }
+  return 0;
 }
 
 /* updates the HL string of a row              *
