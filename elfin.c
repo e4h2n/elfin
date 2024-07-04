@@ -32,14 +32,6 @@ enum KEY_PRESS{
   PGU = 99999,        /* Page Up */
 };
 
-/* debug tool */
-void printRows(editor *E){
-  for(int i = 0; i < E->numrows; i++){
-    printf("%2d: %s\n", i, E->rowarray[i]->text);
-  }
-  printf("\n");
-}
-
 void colorPrint(char* s, int len, int COLOR){
   attron(COLOR_PAIR(COLOR));
   printw("%.*s", len, s);
@@ -65,7 +57,8 @@ int max(int a, int b){
 }
 
 /* PRINTS the editor *
- * MOVES cursor to correct position based on E->mr, E->mc */
+ * MOVES cursor to correct position based on E->mr, E->mc *
+ * ASSUMES cursor is in view */
 void displayEditor(editor *E){
   int maxr = getmaxy(stdscr)-1;
   int width = getmaxx(stdscr) - 5;
@@ -76,6 +69,8 @@ void displayEditor(editor *E){
   // for cursor position
   int dr = -1; // -1 means not yet found
   int dc; // uninitialized so it will crash if something goes wrong :D
+
+  bool selected = false;
   
   // iterate over the rows, starting at toprow
   for (int curr_row_number = E->toprow; currln <= maxr; curr_row_number++){
@@ -88,32 +83,37 @@ void displayEditor(editor *E){
       attron(COLOR_PAIR(LINENUMBER_PAIR));
       printw("%4d ", curr_row_number + 1);
       attroff(COLOR_PAIR(LINENUMBER_PAIR));
-      
-      int sublines = (curr_row->len)/width + !!((curr_row->len)%width); // ceil division
-      for (int j = 0; j < sublines && currln <= maxr; j++){
-        // cursor finding
-        // default to last subrow, rightmost col
-        if (dr < 0 && curr_row_number == E->mr && (j == E->mc/width || j == sublines-1)){
-          dr = currln;
-          dc = min(E->mc, curr_row->len-1);
-          dc %= width;
-        }
 
-        if (j){ // this means we are in a subline, clear any line number previously printed
+      for(int col = 0; col < curr_row->len; col++){
+        if (col/width && (col%width == 0)){ // new subrow
+          currln++;
           move(currln, 0);
           clrtoeol();
+        }        
+        if (currln > maxr){
+          break;
         }
-        // print subrow contents
-        move(currln, 5);
-        colorPrint(curr_row->text + j*width, width, DEFAULT_PAIR);
-        currln++;
+
+        // cursor finding
+        if(dr == -1 && curr_row_number == E->mr && (col == E->mc || col == curr_row->len-1)){
+          dr = currln;
+          dc = col%width + 5;
+          selected = !selected;
+        }
+        if (curr_row_number == E->ar && col == E->ac){
+          selected = !selected;
+        }
+
+        move(currln, col%width + 5);
+        colorPrint(curr_row->text + col, 1, (selected && E->ar >= 0) ? INV_PAIR : DEFAULT_PAIR); // meh
+
       }
     } else { // past the end of the file
-      currln ++;
       colorPrint("~", 1, LINENUMBER_PAIR);
     }
+    currln++;
   }
-  move(dr, dc+5);
+  move(dr, dc);
 }
 
 /* PRINT the status */
@@ -156,6 +156,7 @@ void repositionView(editor *E){ // for scrolling, usually
   int botr = findBotRow(E, &extra);
 
   while(E->mr > botr) { // cursor past bottom row
+    // could be more efficient, but be careful with sublines!
     E->toprow++;
     botr = findBotRow(E, &extra);
   }
@@ -174,6 +175,24 @@ void repositionView(editor *E){ // for scrolling, usually
   }
 
   E->toprow = min(E->toprow, E->numrows-1); // safety first!
+}
+
+int charsBetween(editor* E, int r1, int c1, int r2, int c2){
+  int out = 0;
+  for (int i = min(r1, r2); i < max(r1, r2); i++){
+    out += E->rowarray[i]->len;
+  }
+  if (r1 < r2){
+    out -= c1;
+    out += c2;
+  } else if (r2 < r1){
+    out -= c2;
+    out += c1;
+  } else{
+    out -= min(c1, c2);
+    out += max(c1, c2);
+  }
+  return out;
 }
 
 /* COMMAND MODE *
@@ -237,43 +256,7 @@ Mode Command(editor* E, int input){
   return COMMAND;
 }
 
-/* VIEW MODE *
- * scrolling, cursor movement, yank/paste */
-Mode View(editor *E, int input){
-  if (E->mode != VIEW) return E->mode;
-  
-  if (input == ':'){ // ENTER COMMAND MODE    
-    // clear out the command line first
-    commandrow* C = E->command;
-    erow* curr_row = C->cmd;
-    if (curr_row->len != 0){
-      free(curr_row->text);
-      curr_row->text = strdup("");
-      curr_row->len = 0;
-      C->mcol = 0;
-    }
-    return COMMAND;
-  } else if (input == 'i'){ // ENTER INSERT MODE
-    return INSERT;
-  } else if ((input == DOWN || input == 'j')){ // arrow keys, move cursor
-    E->toprow += (E->mr == E->numrows-1); // CAN EXCEED NUMLINES, caught in repositionView
-    E->mr = min(E->numrows-1, E->mr+1);
 
-  } else if ((input == UP || input == 'k')){
-    E->mr = max(0, E->mr-1);
-  } else if ((input == LEFT || input == 'h') && E->mc > 0){
-    E->mc = min(E->rowarray[E->mr]->len - 1, E->mc - 1);
-  } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr]->len-1){
-    E->mc ++;
-  } else if (input == 'd' && getch() == 'd'){
-    deleteRow(E, E->mr);
-    E->mr = min(E->mr, E->numrows-1);
-  }  else if (input == '.'){
-    return Command(E, '\n');
-  }
-
-  return VIEW; // STAY IN VIEW MODE
-}
 
 /* INSERT MODE *
  * typing, cursor movement, deletion */
@@ -341,6 +324,79 @@ Mode Insert(editor *E, int input){
   return INSERT;
 }
 
+void delSelected(editor* E){
+  if (E->ar == -1) return; // nothing selected
+
+  int bigr, bigc;
+  bigr = max(E->ar, E->mr);
+  bigc = E->ar > E->mr ? E->ac : E->mc;
+  if(E->ar == E->mr) bigc = max(E->ac, E->mc);
+
+  int counter = charsBetween(E, E->mr, E->mc, E->ar, E->ac);
+
+  E->mr = bigr;
+  E->mc = min(bigc, E->rowarray[E->mr]->len);
+
+  E->mode = INSERT;
+
+  for(; counter > 0; counter--){
+    Insert(E, BACKSPACE);
+  }
+
+  E->ar = -1;
+
+  E->mode = VIEW;
+}
+
+/* VIEW MODE *
+ * scrolling, cursor movement, yank/paste */
+Mode View(editor *E, int input){
+  if (E->mode != VIEW) return E->mode;
+  
+  if (input == ':'){ // ENTER COMMAND MODE    
+    // clear out the command line first
+    // TODO make a function for clearing the cmd line
+    commandrow* C = E->command;
+    erow* curr_row = C->cmd;
+    if (curr_row->len != 0){
+      free(curr_row->text);
+      curr_row->text = strdup("");
+      curr_row->len = 0;
+      C->mcol = 0;
+    }
+    return COMMAND;
+  } else if (input == 'i'){ // ENTER INSERT MODE
+    return INSERT;
+  } else if (input == 'v'){
+    if (E->ar != -1) { E->ar = -1; }
+    else {
+    E->ar = E->mr;
+    E->ac = min(E->mc, E->rowarray[E->mr]->len-1);
+    }
+  } else if ((input == DOWN || input == 'j')){ // arrow keys, move cursor
+    E->toprow += (E->mr == E->numrows-1); // CAN EXCEED NUMLINES, caught in repositionView
+    E->mr = min(E->numrows-1, E->mr+1);
+
+  } else if ((input == UP || input == 'k')){
+    E->mr = max(0, E->mr-1);
+  } else if ((input == LEFT || input == 'h') && E->mc > 0){
+    E->mc = min(E->rowarray[E->mr]->len - 1, E->mc - 1);
+  } else if ((input == RIGHT || input == 'l') && E->mc < E->rowarray[E->mr]->len-1){
+    E->mc ++;
+  } else if (input == 'd'){
+    if (E->ar != -1){
+      delSelected(E);
+    } else if (getch() == 'd'){
+      deleteRow(E, E->mr);
+      E->mr = min(E->mr, E->numrows-1);
+    }
+  }  else if (input == '.'){
+    return Command(E, '\n');
+  }
+
+  return VIEW; // STAY IN VIEW MODE
+}
+
 int main(int argc, char *argv[]){
   if (argc != 2){
     printf("USAGE: elfin <filename>\n");
@@ -365,6 +421,9 @@ int main(int argc, char *argv[]){
   E->mc = 1;
 
   while(1){
+    if (E->mode != VIEW){
+      E->ar = -1;
+    }
     repositionView(E);
     displayEditor(E);
     int dmr = getcury(stdscr); // yeah this is a little awkward

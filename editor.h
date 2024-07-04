@@ -25,6 +25,7 @@ typedef struct commandrow {
 typedef struct editor{
   /* display info */
   int mr,mc; // cursor position
+  int ar,ac; // anchor position, for selecting text
   int toprow; // row currently at the top of the display
   char status[80]; // status message
   Mode mode;
