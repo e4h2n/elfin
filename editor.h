@@ -3,12 +3,12 @@
 struct erow {
   int len;
   char* text;
-} erow;
+};
 
 struct editor {
   int numrows;
   struct erow** rowarray;
-} editor;
+};
 
 void deleteChar(struct erow* row, int pos);
 void insertChar(struct erow* row, int pos, char c);

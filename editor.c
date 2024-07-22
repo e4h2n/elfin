@@ -102,7 +102,7 @@ void deleteRow(struct editor *E, int rownum){
 }
 
 struct editor* editorFromFile(char* filename){
-  struct editor* E = malloc(sizeof(editor));
+  struct editor* E = malloc(sizeof(struct editor));
   E->numrows = 0;
   E->rowarray = NULL;
   FILE* fp = fopen(filename, "r");
