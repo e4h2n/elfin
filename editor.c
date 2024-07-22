@@ -1,243 +1,148 @@
-/* API for a simple text editor *
- * personal project by Eshan Bajwa (eshanbajwa@gmail.com) *
- * based on 'kilo' by Salatore Sanfilippo (antirez@gmail.com) *
- * and the associated snaptoken tutorial by Paige Ruten (paige.ruten@gmail.com) */
+#include "editor.h"
 
 #include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <assert.h>
+#include <string.h>
 
-#include "editor.h"
+#include <assert.h>
 
 #define UNUSED(x) (void)(x)
 
-/* insert a character into a line at the specified position, if valid */
-/* returns 1 if successful, else 0 */
-bool insertChar(erow *row, int pos, char c){
-  if(pos < 0 || pos > row->len) return false; // invalid location
+void freeRow(struct erow** ptr){
+  struct erow* row = *ptr;
+  free(row->text);
+  free(row);
+  *ptr = NULL;
+}
 
+/* insert a character into a line at the specified position *
+ * must be a valid position and row */
+void insertChar(struct erow* row, int pos, char c){
+  assert(row);
+  assert(pos >= 0 && pos <= row->len);
+
+  row->len ++;
   row->text = realloc(row->text, row->len+1);
 
   memmove(row->text + pos + 1, row->text + pos, row->len - pos);
 
   row->text[pos] = c;
-  row->len ++;
-  return true;
 }
 
-/* delete a  character from a line at the specified position, if valid */
-/* returns true if successful, else false */
-bool deleteChar(erow *row, int pos){
-  if(pos < 0 || pos >= row->len) return false; // invalid location
+/* insert a string into a line at the specified position *
+ * must be a valid position and row */
+void insertString(struct erow* row, int pos, char* str, int len){
+  assert(row);
+  assert(pos >= 0 && pos <= row->len);
 
-  memmove(row->text+pos, row->text + pos + 1, row->len - pos);
+  row->len += len;
+  row->text = realloc(row->text, row->len+1);
+  // previous len = row->len - len
+  memmove(row->text + pos + len, row->text + pos, row->len - len - pos);
+  strncpy(row->text+pos, str, len);
+}
+
+/* delete a  character from a line at the specified position *
+ * must be a valid position and row */
+void deleteChar(struct erow* row, int pos){
+  assert(row);
+  assert(pos >= 0 && pos < row->len);
+
+  memmove(row->text + pos, row->text + pos + 1, row->len - pos);
+  // realloc?
   row->len --;
-  return true;
 }
 
-/* insert a new row into the editor at rownum */
-void newRow(editor *E, int rownum){
-  if (rownum >= E->numrows){
-    /* trying to insert past the length of editor, 
-     * realloc and insert empty rows until rownum */
-    E->rowarray = realloc(E->rowarray, (rownum + 1)*sizeof(erow*));
-    for (int i = E->numrows; i <= rownum; i++){
-      E->rowarray[i] = malloc(sizeof(erow));
-      E->rowarray[i]->len = 0;
-      E->rowarray[i]->text = strdup("");
-      E->rowarray[i]->hl = malloc(sizeof(int));
-    }
-    E->numrows = rownum + 1;
-  }
-  else{
-    /* insert one new row in the middle of the editor's rows */
-    E->rowarray = realloc(E->rowarray, (E->numrows+1)*sizeof(erow*));
-    int rowshift = E->numrows - rownum;
+/* insert a new row in the editor *
+ * must be possible (ex. cannot insert row 13 in a 5-row editor) *
+ * CAN insert ONE row past the last row(ex. new row 5 into a 5-row editor) */
+void newRow(struct editor *E, int rownum){
+  assert(rownum <= E->numrows);
 
-    memmove(E->rowarray + rownum+1, E->rowarray + rownum,sizeof(erow*)*rowshift);
+  E->rowarray = realloc(E->rowarray, (E->numrows+1)*sizeof(struct erow*));
+  E->rowarray[E->numrows] = NULL;
+  int shift = E->numrows - rownum;
+  memmove(E->rowarray + rownum+1, E->rowarray + rownum, shift*sizeof(struct erow*));
 
-    E->rowarray[rownum] = malloc(sizeof(erow));
-    E->rowarray[rownum]->len = 0;
-    E->rowarray[rownum]->text = strdup("");
-    E->rowarray[rownum]->hl = malloc(sizeof(int));
-    E->numrows ++;
-  }
+  struct erow* new_row = malloc(sizeof(struct erow));
+  new_row->len = 0;
+  new_row->text = malloc(sizeof(char));
+  new_row->text[0] = '\0';
+
+  E->rowarray[rownum] = new_row;
+  E->numrows++;
 }
 
-void freeRow(erow** ptr){
-  erow* row = *ptr;
-  free(row->text);
-  free(row->hl);
-  free(row);
-  *ptr = NULL;
+/* insert \n at the specified postion *
+ * moves everything past the \n to a new row */
+void insertNewline(struct editor *E, int row, int col){
+  assert(row < E->numrows);
+  assert(col <= E->rowarray[row]->len);
+
+  newRow(E, row+1);
+  struct erow* curr_row = E->rowarray[row];
+  struct erow* new_row = E->rowarray[row+1];
+
+  new_row->text = realloc(new_row->text, curr_row->len - col + 1);
+  strncpy(new_row->text, curr_row->text + col, curr_row->len - col + 1);
+  new_row->len = curr_row->len - col;
+
+  curr_row->text[col] = '\0';
+  curr_row->len = col;
 }
 
-/* deletes the specified row from the editor, shifting rows below it up by one */
-void deleteRow(editor *E, int rownum){
-  //if (rownum < 0 || rownum >= E->numrows) return; // invalid row
-  erow* deleted_row = E->rowarray[rownum];
-  
-  if (E->numrows == 1){
-    assert(rownum == 0);
-    free(deleted_row->text);
-    deleted_row->text = strdup("");
-    deleted_row->len = 1;
-    return;
-  }
-
-  int num_moved = E->numrows - rownum + 1;
-
-  freeRow(&deleted_row);
-  if (rownum + 1 < E->numrows){
-    memmove(E->rowarray + rownum, E->rowarray + rownum+1, sizeof(erow*)*num_moved);
-    E->rowarray[E->numrows-1] = NULL;
-  }
+void deleteRow(struct editor *E, int rownum){
+  assert(rownum >= 0);
+  assert(E->numrows > rownum);
+  // realloc?
+  freeRow(E->rowarray + rownum);
+  int shift = E->numrows-1 - rownum;
+  memmove(E->rowarray + rownum, E->rowarray + rownum+1, shift*sizeof(struct erow*));
   E->numrows --;
 }
 
-/* truncates a row and inserts the truncated portion into a new row below */
-void splitRow(editor *E, int rownum, int pos){
-  if (rownum < 0 || rownum > E->numrows) return; // invalid row
-  if (pos < 0 || pos > E->rowarray[rownum]->len) return; // invalid pos
-
-  newRow(E, rownum + 1);
-  erow *currrow = E->rowarray[rownum];
-  erow *newrow = E->rowarray[rownum + 1];
-  
-  newrow->len = currrow->len - pos;
-
-  free(newrow->text);
-  newrow->text = strdup(currrow->text + pos);
-
-  currrow->len = pos+1;
-  currrow->text[pos] = '\0';
-  currrow->text = realloc(currrow->text, currrow->len);
-}
-
-/* concatenates a row with the row above it, deleting the original row */
-void delCatRow(editor *E, int rownum){
-  if (rownum <= 0 || rownum >= E->numrows) return; // invalid row
-
-  erow *top_row = E->rowarray[rownum - 1];
-  erow *bot_row = E->rowarray[rownum];
-
-  top_row->text = realloc(top_row->text, top_row->len + bot_row->len);
-  top_row->len = top_row->len + bot_row->len - 1;
-  strcat(top_row->text, bot_row->text);
-  deleteRow(E, rownum);
-}
-
-/* finds the next occurance of a string starting from r, c in the file*
- * sets r, c to the coordinate of the first char in the string, if found *
- * returns 0 if no match, 1 if there is a match */
-int findNext(editor *E, int* r, int* c, char* needle){
-  if (!r || !c) return 0;
-  
-  char* haystack;
-  char* occurs;
-  for(int i = *r; i < E->numrows; i++){
-    if (i == *r){ // first iteration, start at col
-      haystack = E->rowarray[i]->text + *c + 1;
-    } else{
-      haystack = E->rowarray[i]->text;
-    }
-
-    if ((occurs = strnstr(haystack, needle, E->rowarray[i]->len))){
-      *r = i;
-      *c = occurs - E->rowarray[i]->text;
-      return 1;
-    }
-  }
-  return 0;
-}
-
-/* updates the HL string of a row              *
- * requires a start state (multiline comments) */
-// TODO
-void updateRowHL(erow* row, int startHL){
-  //realloc(row->hl, row->len);
-  //iterate through the line, setting each entry
-  UNUSED(startHL);
-  UNUSED(row);
-}
-
-
-editor* editorFromFile(char* filename){
-  int c;
-  editor* E = malloc(sizeof(editor));
-  E->mr = 0;
-  E->mc = 1;
-  E->toprow = 0;
-  E->mode = VIEW;
-
+struct editor* editorFromFile(char* filename){
+  struct editor* E = malloc(sizeof(editor));
   E->numrows = 0;
-  E->rowarray = malloc(sizeof(erow*));
-  E->filename = strdup(filename);
-
-  E->command = malloc(sizeof(commandrow));
-  E->command->mcol = 0;
-  E->command->cmd = malloc(sizeof(erow));
-
-  E->command->cmd->text = strdup("");
-  E->command->cmd->len = 0;
-  //E->filename = strdup(filename);
-  
+  E->rowarray = NULL;
   FILE* fp = fopen(filename, "r");
-
   newRow(E, 0);
+  if (!fp){ // NEW FILE
+    return E;
+  }
 
-  erow* curr_row;
+  int c;
   while((c = fgetc(fp)) != EOF){
-    curr_row = E->rowarray[E->numrows - 1];
+    struct erow* curr_row = E->rowarray[E->numrows - 1];
     if (c == '\n'){
-      insertChar(curr_row, curr_row->len, '\0');
       newRow(E, E->numrows);
-    }
-    else{
+    } else if (c != '\r'){
       insertChar(curr_row, curr_row->len, c);
     }
   }
-
-  if(curr_row->text[curr_row->len-1] != '\0'){
-    insertChar(curr_row, curr_row->len, '\0');
-  }
-
-  if(E->numrows > 1 && E->rowarray[E->numrows-1]->len == 0){ // stop it from adding extra lines
+  // don't create a new line for the last line terminator
+  // for a non-empty file
+  if(E->numrows > 1 && E->rowarray[E->numrows-1]->len == 0){
     deleteRow(E, E->numrows-1);
   }
-
   fclose(fp);
   return E;
 }
 
-void saveToFile(editor* E){
-  FILE* fp = fopen(E->filename, "w");
-  if (!fp){
-    return;
-  }
-
+void editorSaveFile(struct editor* E, char* filename){
+  FILE* fp = fopen(filename, "w");
   for(int i = 0; i < E->numrows; i++){
     fprintf(fp, "%s\n", E->rowarray[i]->text);
   }
+  fclose(fp);
 }
 
-void deleteEditor(editor** ptr){
-  editor* E = *ptr;
-  // delete all rows
-  while(E->numrows > 1){
-    deleteRow(E, 0);
+void destroyEditor(struct editor** ptr){
+  struct editor* E = *ptr;
+  for(int i = 0; i < E->numrows; i++){
+    freeRow(E->rowarray+i);
   }
-  freeRow(&E->rowarray[0]); // free 0th row
   free(E->rowarray);
-  free(E->filename);
-
-  // command row
-  commandrow* C = E->command;
-  freeRow(&(C->cmd));
-  free(C);
-
   free(E);
   *ptr = NULL;
 }
