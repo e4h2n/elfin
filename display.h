@@ -55,9 +55,9 @@ void abFree(struct abuf* ab);
 
 point search(point start, char* needle);
 
-void adjustToprow();
-void clearScreen();
-void printEditorContents();
-void statusPrintMode();
-void printEditorStatus();
+void adjustToprow(void);
+void clearScreen(void);
+void printEditorContents(void);
+void statusPrintMode(void);
+void printEditorStatus(void);
 void resize(int _);

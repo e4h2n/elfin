@@ -89,13 +89,13 @@ point search(point start, char* needle){
 }
 
 /* ======= DISPLAY UTILS ======= */
-point getBoundedCursor(){
+point getBoundedCursor(void){
   point out = I->cursor;
   out.c = min(out.c, I->E->rowarray[out.r]->len);
   return out;
 }
 
-point getLargestDisplayedPoint(){ // TODO technically doesn't work because of wide chars
+point getLargestDisplayedPoint(void){ // TODO technically doesn't work because of wide chars
   int maxr = I->ws.ws_row;
   int maxc = I->ws.ws_col - I->coloff - 1;
   struct editor* E = I->E;
@@ -116,7 +116,7 @@ point getLargestDisplayedPoint(){ // TODO technically doesn't work because of wi
   return out;
 }
 
-void adjustToprow(){
+void adjustToprow(void){
   if(I->cursor.r < I->toprow){
     I->toprow = I->cursor.r;
     return;
@@ -126,13 +126,13 @@ void adjustToprow(){
 }
 
 /* ======= DISPLAY ======= */
-void clearScreen(){
+void clearScreen(void){
   write(STDIN_FILENO, szstr("\x1b[2J"));
 }
 
-void printEditorContents(){
-	int maxr = I->ws.ws_row; // height
-	int maxc = I->ws.ws_col - I->coloff - 1; // width
+void printEditorContents(void){
+  int maxr = I->ws.ws_row; // height
+  int maxc = I->ws.ws_col - I->coloff - 1; // width
 
   struct editor* E = I->E;
   int visual_r = 1;
@@ -218,7 +218,7 @@ void printEditorContents(){
   free(ab.buf);
 }
 
-void statusPrintMode(){ // TODO rename this lol
+void statusPrintMode(void){ // TODO rename this lol
   if(I->mode == COMMAND){
     abAppend(&I->status, I->cmd.msg.text, I->cmd.msg.len);
     return;
@@ -250,7 +250,7 @@ void statusPrintMode(){ // TODO rename this lol
   free(buf);
 }
 
-void printEditorStatus(){
+void printEditorStatus(void){
   struct abuf ab = {NULL, 0};
   abAppend(&ab,szstr("\x1b[?25l")); // hide cursor
   move(&ab, I->ws.ws_row, 0);

@@ -43,11 +43,11 @@ void die(const char *s) {
   exit(1);
 }
 
-void disableRawMode() {
+void disableRawMode(void) {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) die("tcsetattr");
 }
 
-void enableRawMode() {
+void enableRawMode(void) {
   if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
   atexit(disableRawMode);
   struct termios raw = orig_termios;
@@ -60,7 +60,7 @@ void enableRawMode() {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
-int readKey(){
+int readKey(void){
   int nread;
   char c;
   while((nread = read(STDIN_FILENO, &c, 1)) != 1){
@@ -82,7 +82,7 @@ int readKey(){
   return c;
 }
 
-void cleanup(){
+void cleanup(void){
   destroyEditor(&I->E);
   free(I->cmd.msg.text);
   free(I->status.buf);
