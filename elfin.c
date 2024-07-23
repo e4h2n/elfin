@@ -155,6 +155,11 @@ void View(int c){
     case 'l': 
       I->cursor.c = I->cursor.c + (I->cursor.c < curr_row->len ? 1 : 0);
       break;
+    case '0':
+      I->cursor.c = 0;
+      break;
+    case '$':
+      I->cursor.c = curr_row->len;
   }
 }
 
