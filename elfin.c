@@ -174,7 +174,7 @@ void Insert(int c){
       }
       break;
     case ARROW_UP:
-      if(I->cursor.c >= maxc && I->cursor.c <= curr_row->len){
+      if(I->cursor.c >= maxc && curr_row->len >= maxc){
         // if we are in a subline AND we are NOT past the EOL
         I->cursor.c -= maxc;
       } else{
