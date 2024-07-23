@@ -148,9 +148,10 @@ void Insert(int c){
       break;
     case ARROW_DOWN:
       if(I->cursor.c < curr_row->len - curr_row->len%maxc){ // not on last subline
-        I->cursor.c = min(I->cursor.c + maxc, curr_row->len);
+        I->cursor.c += maxc;
       } else{
         I->cursor.r = min(I->E->numrows-1, I->cursor.r + 1);
+        I->cursor.c = I->cursor.c % maxc;
       }
       break;
     case ARROW_UP:
@@ -159,6 +160,8 @@ void Insert(int c){
         I->cursor.c -= maxc;
       } else{
         I->cursor.r = max(0, I->cursor.r - 1);
+        curr_row = I->E->rowarray[I->cursor.r];
+        I->cursor.c = curr_row->len - (curr_row->len % maxc) + I->cursor.c;
       }
       break;
     case ARROW_LEFT:
