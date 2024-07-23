@@ -120,6 +120,14 @@ void View(int c){
       I->cursor.c = 0; // TODO make this ignore leading whitespace
       I->mode = INSERT;
       break;
+    case 'a':
+      I->cursor.c = I->cursor.c + (I->cursor.c < curr_row->len ? 1 : 0);
+      I->mode = INSERT;
+      break;
+    case 'A':
+      I->cursor.c = curr_row->len;
+      I->mode = INSERT;
+      break;
     case ARROW_DOWN:
     case 'j':
       I->cursor.r = min(I->E->numrows-1, I->cursor.r + 1);
