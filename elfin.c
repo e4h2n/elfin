@@ -128,6 +128,17 @@ void View(int c){
       I->cursor.c = curr_row->len;
       I->mode = INSERT;
       break;
+    case 'o':
+      I->cursor.c = curr_row->len;
+      Insert(ENTER);
+      I->mode = INSERT;
+      break;
+    case 'O':
+      I->cursor.c = 0;
+      Insert(ENTER);
+      View('k');
+      I->mode = INSERT;
+      break;
     case ARROW_DOWN:
     case 'j':
       I->cursor.r = min(I->E->numrows-1, I->cursor.r + 1);
