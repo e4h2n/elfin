@@ -7,7 +7,6 @@
 #include "display.h"
 
 #define szstr(str) str,sizeof(str)
-#define ANSI_BUFSIZE 32
 
 extern struct editorInterface* I;
 
@@ -52,9 +51,11 @@ void abAppend(struct abuf* ab, char *s, int len){
 
 // append the MOVE esc sequence to a string
 void move(struct abuf* ab, int r, int c){
-  char buf[ANSI_BUFSIZE];
-  snprintf(buf, ANSI_BUFSIZE, "\x1b[%d;%dH", r, c);
-  abAppend(ab, buf, strnlen(buf, ANSI_BUFSIZE));
+  char* buf;
+  int len = asprintf(&buf, "\x1b[%d;%dH", r, c);
+  if(len < 0) return;
+  abAppend(ab, buf, len);
+  free(buf);
 }
 
 void abFree(struct abuf* ab){
@@ -164,7 +165,7 @@ void printEditorContents(void){
       char* to_add = curr_row->text + c;
       int cwidth = 1;
       if (*to_add == '\t') { // TODO abstract
-        cwidth = 2;
+        cwidth = 4;
       }
       visual_c += cwidth;
       
@@ -191,7 +192,7 @@ void printEditorContents(void){
       /* WRITING CHARACTER */
       // TODO abstract character substitution
       if (*to_add == '\t') { // replace tabs with double spaces
-        abAppend(&ab, "  ", 2);
+        abAppend(&ab, "    ", 4);
       } else {
         abAppend(&ab, to_add, 1);
       }
