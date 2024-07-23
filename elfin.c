@@ -225,6 +225,9 @@ void doCommand(struct erow cmd){
     editorSaveFile(I->E, I->filename);
   } else if (!strncmp(cmd.text, ":q", cmd.len)){
     I->mode = QUIT;
+  } else if (!strncmp(cmd.text, ":wq", cmd.len)){
+    editorSaveFile(I->E, I->filename);
+    I->mode = QUIT;
   }
 }
 
