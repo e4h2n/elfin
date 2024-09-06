@@ -170,9 +170,16 @@ void printEditorContents(void){
 			abAppend(&ab, szstr("\x1b[48;2;" SELECT_BG "m")); // start sel
 		}
 
-		if (curr_row->len == 0 && I->cursor.r == r){ // cursor on empty line
-			save_cursor.r = visual_r;
-			save_cursor.c = I->coloff + 1;
+		if (curr_row->len == 0){ // empty line
+			if (I->cursor.r == r) { // cursor here
+				save_cursor.r = visual_r;
+				save_cursor.c = I->coloff + 1;
+			}
+			abAppend(&ab, szstr(" "));
+			if (endSel.r == r) { // end selection here
+				abAppend(&ab, szstr("\x1b[49m")); // end sel
+				select = false;
+			}
 		}
 		// ITER OVER EACH CHAR (0-indexed)
 		for(int c = 0; c < curr_row->len && visual_r < maxr; c++) {
