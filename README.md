@@ -3,8 +3,9 @@ Elfin is a terminal-based, from scratch text editor based on 'Kilo' by Salvatore
 - Insert, View, and Command modes
 - Some basic motions
 - Text wrapping
+- Highlight selected text
 # WIP
-- Text selection + copy/paste
+- Do actions on selected text (copy/paste, delete, etc.)
 - Syntax highlighting
 - Undo
 
