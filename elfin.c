@@ -234,6 +234,8 @@ void doCommand(struct erow cmd){
 
 	if (cmd.text[0] == '/'){
 		I->cursor = search(I->cursor, cmd.text+1);
+		I->anchor = I->cursor;
+		I->anchor.c += cmd.len - 2;
 	} else if (!strncmp(cmd.text, ":w", cmd.len)){
 		editorSaveFile(I->E, I->filename);
 	} else if (!strncmp(cmd.text, ":q", cmd.len)){
