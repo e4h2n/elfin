@@ -123,6 +123,7 @@ void View(int c) {
     Command(c);
     break;
   case 'i':
+    I->anchor.r = -1;
     I->mode = INSERT;
     break;
   case 'I':

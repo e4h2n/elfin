@@ -1,2 +1,3 @@
 *.o
 elfin
+.DS_Store
