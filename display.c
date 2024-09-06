@@ -144,9 +144,15 @@ void printEditorContents(void){
 	struct abuf ab = {NULL, 0}; // buffer for the WHOLE screen
 	abAppend(&ab,szstr("\x1b[?25l")); // hide cursor
 
+	point startSel;
+	point endSel;
 	bool select = false;
-	point startSel = minPoint(I->cursor, I->anchor);
-	point endSel = maxPoint(I->cursor, I->anchor);
+	if (I->anchor.r != -1) {
+		startSel = minPoint(I->cursor, I->anchor);
+		startSel.c = min(E->rowarray[startSel.r]->len-1, startSel.c);
+		endSel = maxPoint(I->cursor, I->anchor);
+		endSel.c = min(E->rowarray[endSel.r]->len-1, endSel.c);
+	}
 
 	// ITER OVER THE ROWS
 	for(int r = I->toprow; visual_r < maxr && r < E->numrows; r++) {
@@ -157,9 +163,12 @@ void printEditorContents(void){
 		move(&ab, visual_r, 0);
 		char linenum[I->coloff];
 		sprintf(linenum, "%*d ", I->coloff-1, r+1);
-		abAppend(&ab, szstr("\x1b[38;5;" LINENUM_FG "m")); // set linenum color
+		abAppend(&ab, szstr("\x1b[38;5;" LINENUM_FG "m")); // set FG color
 		abAppend(&ab, linenum, I->coloff);
-		abAppend(&ab, szstr("\x1b[m")); // reset color
+		abAppend(&ab, szstr("\x1b[m")); // reset all formatting
+		if (select) {
+			abAppend(&ab, szstr("\x1b[48;2;" SELECT_BG "m")); // start sel
+		}
 
 		if (curr_row->len == 0 && I->cursor.r == r){ // cursor on empty line
 			save_cursor.r = visual_r;
@@ -167,7 +176,17 @@ void printEditorContents(void){
 		}
 		// ITER OVER EACH CHAR (0-indexed)
 		for(int c = 0; c < curr_row->len && visual_r < maxr; c++) {
-		char* to_add = curr_row->text + c;
+			point curr = {r, c};
+			/* START SELECTION HIGHLIGHTING */
+			if (pointEqual(curr, startSel)) {
+				abAppend(&ab, szstr("\x1b[48;2;" SELECT_BG "m")); // start sel
+				select = true;
+			}
+			if (pointEqual(curr, endSel)) {
+				select = false;
+			}
+
+			char* to_add = curr_row->text + c;
 			int cwidth = 1;
 			if (*to_add == '\t') { // TODO abstract
 				cwidth = 4;
@@ -184,11 +203,11 @@ void printEditorContents(void){
 			}
 
 			/* CURSOR FINDING LOGIC */
-			if(save_cursor.r == -1 && I->cursor.r == r){
+			if(save_cursor.r == -1 && I->cursor.r == r) {
 				if (c == I->cursor.c){ 
 					save_cursor.r = visual_r;
 					save_cursor.c = (visual_c-cwidth+1) % maxc + I->coloff + 1;
-				} else if (c == curr_row->len - 1){
+				} else if (c == curr_row->len - 1) {
 					save_cursor.r = visual_r;
 					save_cursor.c = (visual_c+1) % maxc + I->coloff + 1;
 				}
@@ -196,16 +215,25 @@ void printEditorContents(void){
 
 			/* WRITING CHARACTER */
 			// TODO abstract character substitution
-			if (*to_add == '\t') { // replace tabs with double spaces
-				abAppend(&ab, " 	 	", 4);
+			if (*to_add == '\t') { // replace tabs with 4x spaces
+				abAppend(&ab, "    ", 4);
 			} else {
 				abAppend(&ab, to_add, 1);
 			}
+
+			/* END SELECTION HIGHLIGHTING */
+			if (!select) {
+				abAppend(&ab, szstr("\x1b[49m")); // end sel
+			}
 		}
 		// prepare to start a new row
+		abAppend(&ab, szstr("\x1b[49m")); // end sel
 		abAppend(&ab,szstr("\x1b[0K")); // erase to end of line
 		visual_r++;
 	}
+
+	abAppend(&ab, szstr("\x1b[49m")); // end selection, in case it was enabled
+
 	// draw blank lines past the last row
 	for(int r = visual_r; r < maxr; r++){
 		move(&ab, r, 0);

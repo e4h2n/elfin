@@ -4,9 +4,10 @@
 
 #include "editor.h"
 
-// 256 Color
+// RGB
 // color;style
-#define LINENUM_FG "140;2"
+#define LINENUM_FG "140;2;1"
+#define SELECT_BG "42;64;121"
 
 typedef enum Mode{
 	VIEW,

@@ -1,4 +1,4 @@
-#nclude "editor.h"
+#include "editor.h"
 #include "display.h"
 
 #include <stdlib.h>
@@ -161,6 +161,13 @@ void View(int c){
 		case '$':
 			I->cursor.c = curr_row->len;
 			break;
+		case 'v':
+			if (I->anchor.r == -1) {
+				I->anchor = I->cursor;
+			} else {
+				I->anchor.r = -1;
+			}
+			break;
 	}
 }
 
@@ -294,6 +301,7 @@ int main(int argc, char *argv[]){
 	I->coloff = 4;
 	I->cursor.r = 0;
 	I->cursor.c = 0;
+	I->anchor.r = -1;
 	I->cmd.msg.text = strdup("");
 
 	/* terminal setup */
