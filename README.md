@@ -1,6 +1,7 @@
 Elfin is a terminal-based, from scratch text editor based on 'Kilo' by Salvatore Sanfilippo aka antirez.
 # Current Features
 - Insert, View, and Command modes
+- Search
 - Some basic motions
 - Text wrapping
 - Highlight selected text
