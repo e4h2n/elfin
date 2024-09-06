@@ -1,13 +1,13 @@
 #pragma once
 
 struct erow {
-  int len;
-  char* text;
+	int len;
+	char* text;
 };
 
 struct editor {
-  int numrows;
-  struct erow** rowarray;
+	int numrows;
+	struct erow** rowarray;
 };
 
 void deleteChar(struct erow* row, int pos);

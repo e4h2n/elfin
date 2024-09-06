@@ -9,42 +9,42 @@
 #define LINENUM_FG "140;2"
 
 typedef enum Mode{
-  VIEW,
-  INSERT,
-  COMMAND,
-  QUIT
+	VIEW,
+	INSERT,
+	COMMAND,
+	QUIT
 } Mode;
 
 typedef struct point{
-  int r, c;
+	int r, c;
 } point;
 
 struct commandRow{ // for selecting
-  int mcol;
-  struct erow msg;
+	int mcol;
+	struct erow msg;
 };
 
 struct abuf{
-  char* buf;
-  int size;
+	char* buf;
+	int size;
 };
 
 struct editorInterface{
-  char* filename;
-  struct editor* E;
+	char* filename;
+	struct editor* E;
 
-  int toprow;
-  Mode mode;
-  int coloff;
+	int toprow;
+	Mode mode;
+	int coloff;
 
-  struct winsize ws;
+	struct winsize ws;
 
-  // line, pos coords
-  point cursor;
-  point anchor;
+	// line, pos coords
+	point cursor;
+	point anchor;
 
-  struct commandRow cmd;
-  struct abuf status;
+	struct commandRow cmd;
+	struct abuf status;
 };
 
 int min(int a, int b);
