@@ -111,6 +111,9 @@ void doCommand(struct erow cmd);
 void View(int c) {
     struct erow *curr_row = I->E->rowarray[I->cursor.r];
     switch (c) {
+    case ESC:
+        I->anchor.r = -1;
+        break;
     case '.':
         doCommand(I->cmd.msg);
         break;
@@ -210,6 +213,16 @@ void View(int c) {
             point lastPoint = {I->E->numrows - 1,
                                I->E->rowarray[I->E->numrows - 1]->len};
             I->cursor = minPoint(lastPoint, I->cursor);
+        }
+        break;
+    case 'G':
+        I->cursor.r = I->E->numrows - 1;
+        I->cursor.c = max(0, I->E->rowarray[I->cursor.r]->len - 1);
+        break;
+    case 'g':
+        if (readKey() == 'g') {
+            I->cursor.r = 0;
+            I->cursor.c = 0;
         }
         break;
     }
