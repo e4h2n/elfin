@@ -9,9 +9,9 @@ Elfin is a terminal-based, from scratch text editor based on 'Kilo' by Salvatore
 - Text selection
   - Copy/paste
   - Delete
-# WIP
-- Syntax highlighting
-- Undo
+# Possible Future Features
+- Undo (command pattern)
+- Syntax highlighting (naive: keywords, comments, and strings)
 
 # Kilo License
 Copyright (c) 2016, Salvatore Sanfilippo <antirez at gmail dot com>
