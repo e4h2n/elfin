@@ -42,7 +42,7 @@ void insertString(struct erow *row, int pos, char *str, int len) {
   strncpy(row->text + pos, str, len);
 }
 
-/* delete a 	character from a line at the specified position *
+/* delete a character from a line at the specified position *
  * must be a valid position and row */
 void deleteChar(struct erow *row, int pos) {
   assert(row);
@@ -101,6 +101,48 @@ void deleteRow(struct editor *E, int rownum) {
   memmove(E->rowarray + rownum, E->rowarray + rownum + 1,
           shift * sizeof(struct erow *));
   E->numrows--;
+}
+
+void freeRowarr(struct erow** rowarr, int len) {
+	for(int i = 0; i < len; i++) {
+		freeRow(rowarr + i);
+	}
+}
+
+void copyToClipboard(struct editor *E, point start, point end) {
+	freeRowarr(E->clipboard, E->clipboard_len);
+
+	E->clipboard_len = end.r - start.r + 1;
+	E->clipboard = realloc(E->clipboard, sizeof(struct erow*)*E->clipboard_len);
+
+	E->clipboard[0] = malloc(sizeof(struct erow));
+	E->clipboard[0]->len = 0;
+	insertString(E->clipboard[0], 0, E->rowarray[0]->text + start.c, E->rowarray[0]->len - start.c);
+	for(int i = 1; i < E->clipboard_len - 1; i++) {
+		E->clipboard[i] = malloc(sizeof(struct erow));
+		E->clipboard[i]->len = 0;
+		insertString(E->clipboard[i], 0, E->rowarray[start.r + i]->text, E->rowarray[start.r + i]->len);
+	}
+	E->clipboard[E->clipboard_len - 1] = malloc(sizeof(struct erow));
+	E->clipboard[E->clipboard_len - 1]->len = 0;
+	insertString(E->clipboard[end.r - start.r], 0, E->rowarray[end.r]->text, end.c+1);
+}
+
+void pasteClipboard(struct editor* E, point at) {
+	assert(at.r >= 0 && at.r < E->numrows);
+
+	insertString(E->rowarray[at.r], at.c, E->clipboard[0]->text, E->clipboard[0]->len);
+
+	int shifted = E->numrows - at.r - 1;
+	E->numrows += E->clipboard_len - 1;
+	E->rowarray = realloc(E->rowarray, E->numrows*sizeof(struct erow*));
+	memmove(E->rowarray + at.r + E->clipboard_len, E->rowarray + at.r + 1, shifted*sizeof(struct erow*));
+
+	for(int i = 1; i < E->clipboard_len; i++) {
+		E->rowarray[at.r + i] = malloc(sizeof(struct erow));
+		E->rowarray[at.r + i]->len = 0;
+		insertString(E->rowarray[at.r + i], 0, E->clipboard[i]->text, E->clipboard[i]->len);
+	}
 }
 
 struct editor *editorFromFile(char *filename) {

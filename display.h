@@ -11,10 +11,6 @@
 
 typedef enum Mode { VIEW, INSERT, COMMAND, QUIT } Mode;
 
-typedef struct point {
-  int r, c;
-} point;
-
 struct commandRow { // for selecting
   int mcol;
   struct erow msg;
@@ -45,6 +41,9 @@ struct editorInterface {
 
 int min(int a, int b);
 int max(int a, int b);
+
+point maxPoint(point p1, point p2);
+point minPoint(point p1, point p2);
 
 void abAppend(struct abuf *ab, char *s, int len);
 void abFree(struct abuf *ab);
