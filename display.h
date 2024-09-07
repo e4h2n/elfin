@@ -12,38 +12,35 @@
 typedef enum Mode { VIEW, INSERT, COMMAND, QUIT } Mode;
 
 struct commandRow { // for selecting
-  int mcol;
-  struct erow msg;
+    int mcol;
+    struct erow msg;
 };
 
 struct abuf {
-  char *buf;
-  int size;
+    char *buf;
+    int size;
 };
 
 struct editorInterface {
-  char *filename;
-  struct editor *E;
+    char *filename;
+    struct editor *E;
 
-  int toprow;
-  Mode mode;
-  int coloff;
+    int toprow;
+    Mode mode;
+    int coloff;
 
-  struct winsize ws;
+    struct winsize ws;
 
-  // line, pos coords
-  point cursor;
-  point anchor;
+    // line, pos coords
+    point cursor;
+    point anchor;
 
-  struct commandRow cmd;
-  struct abuf status;
+    struct commandRow cmd;
+    struct abuf status;
 };
 
 int min(int a, int b);
 int max(int a, int b);
-
-point maxPoint(point p1, point p2);
-point minPoint(point p1, point p2);
 
 void abAppend(struct abuf *ab, char *s, int len);
 void abFree(struct abuf *ab);
