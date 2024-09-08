@@ -3,6 +3,7 @@
 #include <sys/ioctl.h>
 
 #include "editor.h"
+#include "command.h"
 
 // RGB
 // color;style
@@ -37,6 +38,8 @@ struct editorInterface {
 
     struct commandRow cmd;
     struct abuf status;
+
+	struct commandStack *cmdStack;
 };
 
 int min(int a, int b);

@@ -106,7 +106,7 @@ void cleanup(void) {
 void View(int c);
 void Insert(int c);
 void Command(int c);
-void doCommand(struct erow cmd);
+void doUserCommand(struct erow cmd);
 
 void View(int c) {
     struct erow *curr_row = I->E->rowarray[I->cursor.r];
@@ -115,7 +115,7 @@ void View(int c) {
         I->anchor.r = -1;
         break;
     case '.':
-        doCommand(I->cmd.msg);
+        doUserCommand(I->cmd.msg);
         break;
     case '/':
     case ':':
@@ -193,26 +193,40 @@ void View(int c) {
     } break;
     case 'p':
         if (I->E->clipboard_len > 0) {
-            point at = I->cursor;
-            at.c = min(at.c, max(0, I->E->rowarray[at.r]->len - 1));
-            pasteClipboard(I->E, at);
+			struct command *cmd = malloc(sizeof(struct command));
+			cmd->at = I->cursor;
+            cmd->at.c = min(cmd->at.c, max(0, I->E->rowarray[cmd->at.r]->len));
+			point cb_start = { 0, 0 };
+			point cb_end = { I->E->clipboard_len - 1, 
+							I->E->clipboard[I->E->clipboard_len - 1]->len - 1 };
+			cmd->rows = copyRange(I->E->clipboard, cb_start, cb_end);
+			cmd->numrows = cb_end.r + 1;
+			cmd->type = ADD;
+
+			I->cmdStack = push(cmd, I->cmdStack);
+			doCommand(I->E, cmd);
         }
         break;
     case 'd':
         if (I->anchor.r != -1) {
-            point start = minPoint(I->cursor, I->anchor);
+		    point start = minPoint(I->cursor, I->anchor);
             point end = maxPoint(I->cursor, I->anchor);
             start.c = min(start.c, I->E->rowarray[start.r]->len - 1);
             start.c = max(0, start.c);
             end.c = min(end.c, I->E->rowarray[end.r]->len - 1);
             end.c = max(0, end.c);
 
-            deleteRange(I->E, start, end);
+			struct command *cmd = malloc(sizeof(struct command));
+			cmd->at = start;
+			cmd->rows = copyRange(I->E->rowarray, start, end);
+			cmd->numrows = end.r - start.r + 1;
+			cmd->type = DELETE;
+
+			I->cmdStack = push(cmd, I->cmdStack);
+            doCommand(I->E, cmd);
+
             I->cursor = minPoint(I->anchor, I->cursor);
             I->anchor.r = -1;
-            point lastPoint = {I->E->numrows - 1,
-                               I->E->rowarray[I->E->numrows - 1]->len};
-            I->cursor = minPoint(lastPoint, I->cursor);
         }
         break;
     case 'G':
@@ -225,6 +239,12 @@ void View(int c) {
             I->cursor.c = 0;
         }
         break;
+	case 'u':
+		if (I->cmdStack != NULL) {
+			undoCommand(I->E, I->cmdStack->command);
+			I->cmdStack = remove_node(I->cmdStack);
+		}
+		break;
     }
 }
 
@@ -288,7 +308,7 @@ void Insert(int c) {
     }
 }
 
-void doCommand(struct erow cmd) {
+void doUserCommand(struct erow cmd) {
     if (cmd.len <= 1)
         return;
 
@@ -331,7 +351,7 @@ void Command(int c) {
         break;
     case ENTER:
         I->mode = VIEW;
-        doCommand(I->cmd.msg);
+        doUserCommand(I->cmd.msg);
         break;
 
     default:
@@ -367,6 +387,7 @@ int main(int argc, char *argv[]) {
     I->cursor.c = 0;
     I->anchor.r = -1;
     I->cmd.msg.text = strdup("");
+	I->cmdStack = NULL;
 
     /* terminal setup */
     write(STDIN_FILENO, szstr("\x1b[?1049h")); // start alt buffer
