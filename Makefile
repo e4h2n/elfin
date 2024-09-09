@@ -1,6 +1,5 @@
 CC = clang
 CFLAGS = -Wall -Wpedantic -Werror -Wextra
-LDLIBS = -lncurses
 
 all: elfin
 
