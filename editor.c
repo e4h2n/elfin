@@ -82,7 +82,8 @@ void insertString(struct erow *row, int pos, char *str, int len) {
     }
 
     // whether str overlaps with row->text, if so we need to update the str
-    // pointer after realloc'ing row->text -2 hours :)
+    // pointer after realloc'ing row->text
+    // -2 hours :)
     bool overlaps = str >= row->text && str < row->text + row->len;
     int diff = str - row->text;
 
