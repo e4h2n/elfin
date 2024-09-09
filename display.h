@@ -7,8 +7,9 @@
 
 // RGB
 // color;style
-#define LINENUM_FG "140;2;1"
-#define SELECT_BG "42;64;121"
+#define LINENUM_FG "255;143;98"
+
+#define SELECT_BG "40;64;122"
 
 typedef enum Mode { VIEW, INSERT, COMMAND, QUIT } Mode;
 

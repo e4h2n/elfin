@@ -415,6 +415,18 @@ void editorProcessKey(int c) {
     }
 }
 
+int countDigits(int n) {
+    // technically this says 0 has 0 digits
+    // but that's not a case we worry about
+    // we will always have at least one line
+    int out = 0;
+    while (n != 0) {
+        n /= 10;
+        out++;
+    }
+    return out;
+}
+
 /* ======= main ======= */
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -427,7 +439,7 @@ int main(int argc, char *argv[]) {
     I->E = editorFromFile(I->filename);
     I->toprow = 0;
     I->mode = VIEW;
-    I->coloff = 4;
+    I->coloff = max(4, countDigits(I->E->numrows) + 2);
     I->cursor.r = 0;
     I->cursor.c = 0;
     I->anchor.r = -1;
@@ -446,6 +458,7 @@ int main(int argc, char *argv[]) {
     /* main IO loop */
     while (I->mode != QUIT) {
         I->status.size = 0; // this "clears" the status
+        I->coloff = max(4, countDigits(I->E->numrows) + 2);
         statusPrintMode();
         adjustToprow();
         printEditorStatus();

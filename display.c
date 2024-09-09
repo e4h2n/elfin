@@ -139,7 +139,7 @@ void printEditorContents(void) {
         move(&ab, visual_r, 0);
         char linenum[I->coloff];
         sprintf(linenum, "%*d ", I->coloff - 1, r + 1);
-        abAppend(&ab, szstr("\x1b[38;5;" LINENUM_FG "m")); // set FG color
+        abAppend(&ab, szstr("\x1b[38;2;" LINENUM_FG "m")); // set FG color
         abAppend(&ab, linenum, I->coloff);
         abAppend(&ab, szstr("\x1b[m")); // reset all formatting
         if (select) {
@@ -182,6 +182,7 @@ void printEditorContents(void) {
 
             /* SUBLINE HANDLING */
             if (c != 0 && visual_c % maxc < cwidth) { // new subline?
+                abAppend(&ab, szstr("\x1b[m"));       // reset all formatting
                 visual_c +=
                     cwidth - 1 -
                     (visual_c % maxc); // (wide only) how many 'slots' skipped?
@@ -193,6 +194,10 @@ void printEditorContents(void) {
                         "\x1b[0K")); // erase to end of line (needed for resize)
                 move(&ab, visual_r, I->coloff + 1); // move to upcoming subline
                 abAppend(&ab, szstr("\x1b[1K"));    // erase to start of line
+                if (select) {
+                    abAppend(&ab,
+                             szstr("\x1b[48;2;" SELECT_BG "m")); // start sel
+                }
             }
 
             /* CURSOR FINDING LOGIC */
@@ -228,12 +233,6 @@ void printEditorContents(void) {
 
     abAppend(&ab, szstr("\x1b[49m")); // end selection, in case it was enabled
 
-    // draw blank lines past the last row
-    for (int r = visual_r; r < maxr; r++) {
-        move(&ab, r, 0);
-        abAppend(&ab, szstr("\x1b[0K")); // erase to end of line
-        abAppend(&ab, szstr("~"));
-    }
     // move the cursor to display position
     if (I->mode == COMMAND) {
         move(&ab, maxr, I->cmd.mcol + 1);
@@ -286,6 +285,7 @@ void printEditorStatus(void) {
     move(&ab, I->ws.ws_row, 0);
     abAppend(&ab, I->status.buf, I->status.size); // write the status
     abAppend(&ab, szstr("\x1b[0K"));              // erase to end of line
+    abAppend(&ab, szstr("\x1b[m"));               // reset all formatting
     write(STDIN_FILENO, ab.buf, ab.size);
     free(ab.buf);
 }

@@ -289,7 +289,7 @@ struct editor *editorFromFile(char *filename) {
 void editorSaveFile(struct editor *E, char *filename) {
     FILE *fp = fopen(filename, "w");
     for (int i = 0; i < E->numrows; i++) {
-        fprintf(fp, "%s\n", E->rowarray[i]->text);
+        fprintf(fp, "%.*s\n", E->rowarray[i]->len, E->rowarray[i]->text);
     }
     fclose(fp);
 }

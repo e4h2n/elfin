@@ -1,3 +1,4 @@
 *.o
 elfin
 .DS_Store
+*.txt
