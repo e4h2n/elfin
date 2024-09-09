@@ -1,5 +1,4 @@
 #include "command.h"
-#include "editor.h"
 
 #include <assert.h>
 #include <stdlib.h>
