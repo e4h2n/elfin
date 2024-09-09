@@ -95,6 +95,9 @@ void cleanup(void) {
     destroyEditor(&I->E);
     free(I->cmd.msg.text);
     free(I->status.buf);
+	while(I->cmdStack != NULL) {
+		I->cmdStack = remove_node(I->cmdStack);
+	}
     free(I);
     // TODO FREE other stuff
     clearScreen();
@@ -241,7 +244,14 @@ void View(int c) {
         break;
 	case 'u':
 		if (I->cmdStack != NULL) {
-			undoCommand(I->E, I->cmdStack->command);
+			struct command *cmd = I->cmdStack->command;
+			undoCommand(I->E, cmd);
+
+			I->cursor = cmd->at;
+			if (cmd->type == DELROW) {
+				I->cursor.c = 0;
+			}
+
 			I->cmdStack = remove_node(I->cmdStack);
 		}
 		break;
@@ -283,28 +293,61 @@ void Insert(int c) {
         break;
     case ENTER:
         I->cursor.c = min(I->cursor.c, curr_row->len);
-        insertNewline(I->E, I->cursor.r, I->cursor.c);
+		{
+		struct command *cmd = malloc(sizeof(struct command));
+		cmd->type = NEWROW;
+		cmd->at = I->cursor;
+
+		I->cmdStack = push(cmd, I->cmdStack);
+		doCommand(I->E, cmd);
+		}
+
         I->cursor.c = 0;
         I->cursor.r++;
         break;
     case BACKSPACE:
         I->cursor.c = min(I->cursor.c, curr_row->len);
+		{
+		struct command *cmd = malloc(sizeof(struct command));
+		cmd->at = I->cursor;
         if (I->cursor.c == 0 && I->cursor.r > 0) {
-            struct erow *above_row = I->E->rowarray[I->cursor.r - 1];
-            I->cursor.c = above_row->len;
-            insertString(above_row, I->cursor.c, curr_row->text, curr_row->len);
-            deleteRow(I->E, I->cursor.r);
+			cmd->type = DELROW;
+			cmd->at.c = curr_row->len;
             I->cursor.r--;
+			I->cursor.c = I->E->rowarray[I->cursor.r]->len;
         } else if (I->cursor.c > 0) {
-            deleteChar(curr_row, I->cursor.c - 1);
-            I->cursor.c = max(0, I->cursor.c - 1);
-        }
+			cmd->type = DELETE;
+			cmd->at.c --;
+			cmd->rows = malloc(sizeof(struct erow *));
+			cmd->rows[0] = malloc(sizeof(struct erow));
+			cmd->rows[0]->text = malloc(sizeof(char));
+			cmd->rows[0]->text[0] = I->E->rowarray[cmd->at.r]->text[cmd->at.c];
+			cmd->rows[0]->len = 1;
+			cmd->numrows = 1;
+			I->cursor.c --;
+        } else break;
+		I->cmdStack = push(cmd, I->cmdStack);
+		doCommand(I->E, cmd);
+		}
         break;
 
     default:
         I->cursor.c = min(I->cursor.c, curr_row->len);
-        insertChar(curr_row, I->cursor.c, c);
+		{
+		struct command *cmd = malloc(sizeof(struct command));
+		cmd->at = I->cursor;
+		cmd->type = ADD;
+		cmd->rows = malloc(sizeof(struct erow *));
+		cmd->rows[0] = malloc(sizeof(struct erow));
+		cmd->rows[0]->text = malloc(sizeof(char));
+		cmd->rows[0]->len = 1;
+		cmd->rows[0]->text[0] = c;
+		cmd->numrows = 1;
+
         I->cursor.c++;
+		I->cmdStack = push(cmd, I->cmdStack);
+		doCommand(I->E, cmd);
+		}
     }
 }
 

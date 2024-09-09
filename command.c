@@ -2,6 +2,7 @@
 #include "editor.h"
 
 #include <stdlib.h>
+#include <assert.h>
 
 void doCommand(struct editor *E, struct command *cmd) {
 	if (cmd->type == ADD) {
@@ -13,6 +14,15 @@ void doCommand(struct editor *E, struct command *cmd) {
 		}
 		point end = { cmd->numrows - 1 + cmd->at.r, last_c };
 		deleteRange(E, cmd->at, end);
+	} else if (cmd->type == NEWROW) {
+		insertNewline(E, cmd->at.r, cmd->at.c);
+	} else if (cmd->type == DELROW) {
+		assert(cmd->at.r > 0);
+		struct erow *above = E->rowarray[cmd->at.r - 1];
+		struct erow *at = E->rowarray[cmd->at.r];
+
+		insertString(above, above->len, at->text, at->len);
+		deleteRow(E, cmd->at.r);
 	}
 }
 
@@ -22,12 +32,23 @@ void undoCommand(struct editor *E, struct command *cmd) {
 		inv_cmd.type = DELETE;
 	} else if (inv_cmd.type == DELETE) {
 		inv_cmd.type = ADD;
+	} else if (inv_cmd.type == NEWROW) {
+		inv_cmd.type = DELROW;
+		inv_cmd.at.r ++;
+		inv_cmd.at.c = 0;
+	} else if (inv_cmd.type == DELROW) {
+		// DELROW commands store the length of the line that was deleted
+		// in at.c
+		inv_cmd.type = NEWROW;
+		inv_cmd.at.r --;
+		inv_cmd.at.c = E->rowarray[inv_cmd.at.r]->len - inv_cmd.at.c;
 	}
 	doCommand(E, &inv_cmd);
 }
 
 void freeCommand(struct command *cmd) {
 	freeRowarr(cmd->rows, cmd->numrows);
+	free(cmd->rows);
 	free(cmd);
 }
 

@@ -272,18 +272,7 @@ void statusPrintMode(void) { // TODO rename this lol
     abAppend(&I->status, szstr("\x1b[0K")); // erase to end of line
     free(buf);
     // cursor coordinates
-	point at = { -314, -42 };
-	int nr = -42;
-	int type = -1;
-	char* str = "_";
-	if (I->cmdStack != NULL) {
-		at = I->cmdStack->command->at;
-		nr = I->cmdStack->command->rows[0]->len;
-		type = I->cmdStack->command->type == INSERT ? 1 : 0;
-		str = I->cmdStack->command->rows[0]->text;
-	}
-    asprintf(&buf, "%d, %d | (%d, %d), %d, type: %d, contents: %s", I->cursor.r + 1,
-             I->cursor.c + 1, at.r, at.c, nr, type, str); // asprintf my beloved
+    asprintf(&buf, "%d, %d", I->cursor.r + 1, I->cursor.c + 1); // asprintf my beloved
     len = strlen(buf);
     move(&I->status, I->ws.ws_row, I->ws.ws_col - len);
     abAppend(&I->status, buf, len);

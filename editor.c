@@ -77,11 +77,21 @@ void insertString(struct erow *row, int pos, char *str, int len) {
     assert(row);
     assert(pos >= 0);
 	assert(pos <= row->len);
-    if (len == 0)
+    if (len == 0) {
         return;
+	}
+
+	// whether str overlaps with row->text, if so we need to update the str pointer 
+	// after realloc'ing row->text
+	// -2 hours :)
+	bool overlaps = str >= row->text && str < row->text + row->len;
+	int diff = str - row->text;
 
     row->len += len;
-    row->text = realloc(row->text, row->len + 1);
+    row->text = realloc(row->text, row->len);
+	if (overlaps) {
+		str = row->text + diff;
+	}
     // previous len = row->len - len
     memmove(row->text + pos + len, row->text + pos, row->len - len - pos);
     strncpy(row->text + pos, str, len);
@@ -153,7 +163,7 @@ void deleteRow(struct editor *E, int rownum) {
 
 void freeRowarr(struct erow **rowarr, int len) {
     for (int i = 0; i < len; i++) {
-        freeRow(rowarr + i);
+        freeRow(&rowarr[i]);
     }
 }
 
@@ -195,23 +205,20 @@ void deleteRange(struct editor *E, point start, point end) {
     int shifted = E->numrows - end.r;
     int deleted = end.r - start.r;
 
-	int start_len = start.c;
-
     // append start_row to the front of end_row
 	int insert_pos = min(end_row->len, end.c + 1);
-	insertString(end_row, insert_pos, start_row->text, start_len);
+	insertString(end_row, insert_pos, start_row->text, start.c);
 
     memmove(end_row->text, end_row->text + insert_pos,
-            max(0, end_row->len - end.c + 1) * sizeof(char));
+            max(0, end_row->len - insert_pos) * sizeof(char));
     end_row->len -= insert_pos;
-	
 	assert(end_row->len >= 0);
-
+	
     // free/delete the locations that will be overwritten
     freeRowarr(E->rowarray + start.r, deleted);
     E->numrows -= deleted;
 
-    // shift everything
+    // shift rows to fill the freed entries
     memmove(E->rowarray + start.r, E->rowarray + end.r,
             shifted * sizeof(struct erow *));
 }

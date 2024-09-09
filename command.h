@@ -2,7 +2,7 @@
 
 #include "editor.h"
 
-typedef enum cmdType { ADD, DELETE } cmdType;
+typedef enum cmdType { ADD, DELETE, NEWROW, DELROW } cmdType;
 
 struct command {
 	point at;
