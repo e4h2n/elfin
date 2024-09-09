@@ -2,7 +2,7 @@ IMPORTANT: Your terminal MUST support RGB color format.
 
 Elfin is a terminal-based, from scratch text editor based on 'Kilo' by Salvatore Sanfilippo aka antirez.
 # Current Features
-- Insert (i/I), View (ESC), and Command (:) modes
+- Insert (i/I/o/O/a/A), View (ESC), and Command (:) modes
 - Search (/)
 - Some basic motions
 - Text wrapping
