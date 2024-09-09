@@ -5,15 +5,15 @@
 typedef enum cmdType { ADD, DELETE, NEWROW, DELROW } cmdType;
 
 struct command {
-	point at;
-	struct erow **rows;
-	int numrows;
-	cmdType type;
+    point at;
+    struct erow **rows;
+    int numrows;
+    cmdType type;
 };
 
 struct commandStack {
-	struct command *command;
-	struct commandStack *next;
+    struct command *command;
+    struct commandStack *next;
 };
 
 void doCommand(struct editor *E, struct command *cmd);

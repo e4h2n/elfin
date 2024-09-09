@@ -76,22 +76,21 @@ void insertChar(struct erow *row, int pos, char c) {
 void insertString(struct erow *row, int pos, char *str, int len) {
     assert(row);
     assert(pos >= 0);
-	assert(pos <= row->len);
+    assert(pos <= row->len);
     if (len == 0) {
         return;
-	}
+    }
 
-	// whether str overlaps with row->text, if so we need to update the str pointer 
-	// after realloc'ing row->text
-	// -2 hours :)
-	bool overlaps = str >= row->text && str < row->text + row->len;
-	int diff = str - row->text;
+    // whether str overlaps with row->text, if so we need to update the str
+    // pointer after realloc'ing row->text -2 hours :)
+    bool overlaps = str >= row->text && str < row->text + row->len;
+    int diff = str - row->text;
 
     row->len += len;
     row->text = realloc(row->text, row->len);
-	if (overlaps) {
-		str = row->text + diff;
-	}
+    if (overlaps) {
+        str = row->text + diff;
+    }
     // previous len = row->len - len
     memmove(row->text + pos + len, row->text + pos, row->len - len - pos);
     strncpy(row->text + pos, str, len);
@@ -168,34 +167,34 @@ void freeRowarr(struct erow **rowarr, int len) {
 }
 
 struct erow **copyRange(struct erow **rows, point start, point end) {
-	int numrows = end.r - start.r + 1;
-	struct erow **ret = calloc(sizeof(struct erow *), numrows);
-	if (numrows == 1) {
-		ret[0] = malloc(sizeof(struct erow));
-		ret[0]->len = end.c - start.c + 1;
-		ret[0]->text = calloc(sizeof(char), ret[0]->len);
-		strncpy(ret[0]->text, rows[start.r]->text + start.c, ret[0]->len);
-		return ret;
-	}
-	// copy first row starting from start.c
-	ret[0] = malloc(sizeof(struct erow));
-	ret[0]->len = rows[start.r]->len - start.c;
-	ret[0]->text = calloc(sizeof(char), ret[0]->len);
-	strncpy(ret[0]->text, rows[start.r]->text + start.c, ret[0]->len);
-	// copy middle rows
-	for(int i = 1; i < numrows - 1; i++) {
-		ret[i] = malloc(sizeof(struct erow));
-		ret[i]->len = rows[start.r + i]->len;
-		ret[i]->text = calloc(sizeof(char), ret[i]->len);
-		strncpy(ret[i]->text, rows[start.r + i]->text, ret[i]->len);
-	}
-	// copy last row ending at end.c
-	ret[numrows - 1] = malloc(sizeof(struct erow));
-	ret[numrows - 1]->len = end.c + 1;
-	ret[numrows - 1]->text = calloc(sizeof(char), ret[numrows - 1]->len);
-	strncpy(ret[numrows - 1]->text, rows[end.r]->text, ret[numrows - 1]->len);
+    int numrows = end.r - start.r + 1;
+    struct erow **ret = calloc(sizeof(struct erow *), numrows);
+    if (numrows == 1) {
+        ret[0] = malloc(sizeof(struct erow));
+        ret[0]->len = end.c - start.c + 1;
+        ret[0]->text = calloc(sizeof(char), ret[0]->len);
+        strncpy(ret[0]->text, rows[start.r]->text + start.c, ret[0]->len);
+        return ret;
+    }
+    // copy first row starting from start.c
+    ret[0] = malloc(sizeof(struct erow));
+    ret[0]->len = rows[start.r]->len - start.c;
+    ret[0]->text = calloc(sizeof(char), ret[0]->len);
+    strncpy(ret[0]->text, rows[start.r]->text + start.c, ret[0]->len);
+    // copy middle rows
+    for (int i = 1; i < numrows - 1; i++) {
+        ret[i] = malloc(sizeof(struct erow));
+        ret[i]->len = rows[start.r + i]->len;
+        ret[i]->text = calloc(sizeof(char), ret[i]->len);
+        strncpy(ret[i]->text, rows[start.r + i]->text, ret[i]->len);
+    }
+    // copy last row ending at end.c
+    ret[numrows - 1] = malloc(sizeof(struct erow));
+    ret[numrows - 1]->len = end.c + 1;
+    ret[numrows - 1]->text = calloc(sizeof(char), ret[numrows - 1]->len);
+    strncpy(ret[numrows - 1]->text, rows[end.r]->text, ret[numrows - 1]->len);
 
-	return ret;
+    return ret;
 }
 
 void deleteRange(struct editor *E, point start, point end) {
@@ -206,14 +205,14 @@ void deleteRange(struct editor *E, point start, point end) {
     int deleted = end.r - start.r;
 
     // append start_row to the front of end_row
-	int insert_pos = min(end_row->len, end.c + 1);
-	insertString(end_row, insert_pos, start_row->text, start.c);
+    int insert_pos = min(end_row->len, end.c + 1);
+    insertString(end_row, insert_pos, start_row->text, start.c);
 
     memmove(end_row->text, end_row->text + insert_pos,
             max(0, end_row->len - insert_pos) * sizeof(char));
     end_row->len -= insert_pos;
-	assert(end_row->len >= 0);
-	
+    assert(end_row->len >= 0);
+
     // free/delete the locations that will be overwritten
     freeRowarr(E->rowarray + start.r, deleted);
     E->numrows -= deleted;
@@ -226,13 +225,13 @@ void deleteRange(struct editor *E, point start, point end) {
 void insertRange(struct editor *E, point at, struct erow **rows, int numrows) {
     assert(at.r >= 0 && at.r < E->numrows);
 
-	if (numrows == 1) {
-    	insertString(E->rowarray[at.r], at.c, rows[0]->text, rows[0]->len);
-		return;
-	}
+    if (numrows == 1) {
+        insertString(E->rowarray[at.r], at.c, rows[0]->text, rows[0]->len);
+        return;
+    }
 
-	insertNewline(E, at.r, at.c);
-	insertString(E->rowarray[at.r], at.c, rows[0]->text, rows[0]->len);
+    insertNewline(E, at.r, at.c);
+    insertString(E->rowarray[at.r], at.c, rows[0]->text, rows[0]->len);
 
     int shifted = E->numrows - at.r;
     E->numrows += numrows - 2;
@@ -240,20 +239,19 @@ void insertRange(struct editor *E, point at, struct erow **rows, int numrows) {
     memmove(E->rowarray + at.r + numrows - 1, E->rowarray + at.r + 1,
             shifted * sizeof(struct erow *));
 
-
     for (int i = 1; i < numrows - 1; i++) {
         E->rowarray[at.r + i] = malloc(sizeof(struct erow));
         E->rowarray[at.r + i]->len = 0;
-        insertString(E->rowarray[at.r + i], 0, rows[i]->text,
-                     rows[i]->len);
+        insertString(E->rowarray[at.r + i], 0, rows[i]->text, rows[i]->len);
     }
 
-	insertString(E->rowarray[at.r + numrows - 1], 0, rows[numrows - 1]->text, rows[numrows - 1]->len);
+    insertString(E->rowarray[at.r + numrows - 1], 0, rows[numrows - 1]->text,
+                 rows[numrows - 1]->len);
 }
 
 void copyToClipboard(struct editor *E, point start, point end) {
     freeRowarr(E->clipboard, E->clipboard_len);
-	free(E->clipboard);
+    free(E->clipboard);
 
     E->clipboard_len = end.r - start.r + 1;
     E->clipboard = copyRange(E->rowarray, start, end);
