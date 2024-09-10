@@ -380,7 +380,6 @@ point search(point start, char *needle) {
     return start;
 }
 
-
 void doUserCommand(struct erow cmd) {
     if (cmd.len <= 1)
         return;

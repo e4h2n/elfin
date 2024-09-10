@@ -205,7 +205,7 @@ void printEditorContents(void) {
     }
 
     // clear all displayed rows past the end of the file
-    for(int r = visual_r; r < maxr; r++) {
+    for (int r = visual_r; r < maxr; r++) {
         move(&ab, r, 0);
         abAppend(&ab, szstr("\x1b[0K")); // erase to end of line
     }
