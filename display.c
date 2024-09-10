@@ -35,33 +35,6 @@ void abFree(struct abuf *ab) {
     free(ab);
 }
 
-/* ======= COMMAND STUFF ======= */
-point search(point start, char *needle) {
-    start.c++;
-    // search from start
-    for (int i = start.r; i < I->E->numrows; i++) {
-        struct erow *curr_row = I->E->rowarray[i];
-        int start_c = i == start.r ? start.c : 0;
-        char *loc =
-            strnstr(curr_row->text + start_c, needle, curr_row->len - start_c);
-        if (loc) {
-            point ret = {i, loc - curr_row->text};
-            return ret;
-        }
-    }
-    // search from beginning
-    for (int i = 0; i < I->E->numrows; i++) {
-        struct erow *curr_row = I->E->rowarray[i];
-        char *loc = strnstr(curr_row->text, needle, curr_row->len);
-        if (loc) {
-            point ret = {i, loc - curr_row->text};
-            return ret;
-        }
-    }
-    start.c--;
-    return start;
-}
-
 /* ======= DISPLAY UTILS ======= */
 point getBoundedCursor(void) {
     point out = I->cursor;
