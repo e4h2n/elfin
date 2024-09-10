@@ -231,6 +231,12 @@ void printEditorContents(void) {
         visual_r++;
     }
 
+    // clear all displayed rows past the end of the file
+    for(int r = visual_r; r < maxr; r++) {
+        move(&ab, r, 0);
+        abAppend(&ab, szstr("\x1b[0K")); // erase to end of line
+    }
+
     abAppend(&ab, szstr("\x1b[49m")); // end selection, in case it was enabled
 
     // move the cursor to display position
@@ -298,6 +304,6 @@ void resize(int _ __attribute__((unused))) {
     I->status.size = 0;
     statusPrintMode();
     adjustToprow();
-    printEditorContents();
     printEditorStatus();
+    printEditorContents();
 }
