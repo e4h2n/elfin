@@ -1,6 +1,6 @@
 Elfin is a terminal-based, from scratch text editor loosely based on 'Kilo' by Salvatore Sanfilippo aka antirez.
 
-# INSTALLATION
+# Installation
 - ``git clone`` this repo
 - navigate to this directory, run ``make``
 - add the following command to your ~/.zshrc or ~/.bashrc: ```export PATH="/~/elfin:$PATH"```
