@@ -6,6 +6,7 @@ Elfin is a terminal-based, from scratch text editor loosely based on 'Kilo' by S
 - add the following command to your ~/.zshrc or ~/.bashrc: ```export PATH="/~/elfin:$PATH"```
 
 now you should be able to run anywhere by typing ``elfin <filename>``
+
 IMPORTANT: Your terminal should support RGB color format.
 
 # Current Features
