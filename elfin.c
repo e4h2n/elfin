@@ -260,30 +260,16 @@ void View(int c) {
 
 void Insert(int c) {
     struct erow *curr_row = I->E->rowarray[I->cursor.r];
-    int maxc = I->ws.ws_col - I->coloff - 1;
     I->anchor.r = -1;
     switch (c) {
     case ESC:
         I->mode = VIEW;
         break;
     case ARROW_DOWN:
-        if (I->cursor.c <
-            curr_row->len - curr_row->len % maxc) { // not on last subline
-            I->cursor.c += maxc;
-        } else {
-            I->cursor.r = min(I->E->numrows - 1, I->cursor.r + 1);
-            I->cursor.c = I->cursor.c % maxc;
-        }
+        I->cursor.r = min(I->E->numrows - 1, I->cursor.r + 1);
         break;
     case ARROW_UP:
-        if (I->cursor.c >= maxc && curr_row->len >= maxc) {
-            // if we are in a subline AND we are NOT past the EOL
-            I->cursor.c -= maxc;
-        } else {
-            I->cursor.r = max(0, I->cursor.r - 1);
-            curr_row = I->E->rowarray[I->cursor.r];
-            I->cursor.c = curr_row->len - (curr_row->len % maxc) + I->cursor.c;
-        }
+        I->cursor.r = max(0, I->cursor.r - 1);
         break;
     case ARROW_LEFT:
         I->cursor.c = max(0, min(I->cursor.c - 1, curr_row->len - 1));
@@ -333,7 +319,7 @@ void Insert(int c) {
         }
         break;
 
-    default:
+    default: // add character
         I->cursor.c = min(I->cursor.c, curr_row->len);
         {
             struct command *cmd = malloc(sizeof(struct command));

@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-
+#include <assert.h>
 #include "display.h"
 
 #define szstr(str) str, sizeof(str)
@@ -69,10 +69,21 @@ void adjustToprow(void) {
         I->toprow = I->cursor.r;
         return;
     }
-
     while (pointGreater(getBoundedCursor(), getLargestDisplayedPoint())) {
         I->toprow++;
     }
+}
+
+void writeCharToBuffer(struct abuf* ab, char* to_add, int visual_c) {
+	if (*to_add == '\t') { // tab handling
+		int num_spaces = TAB_WIDTH - (visual_c % TAB_WIDTH);
+		char* tab_string;
+		asprintf(&tab_string, "%*s", num_spaces, ""); // left pads the empty string
+		abAppend(ab, tab_string, num_spaces);
+		free(tab_string);
+	} else {
+		abAppend(ab, to_add, 1);
+	}
 }
 
 /* ======= DISPLAY ======= */
@@ -94,7 +105,7 @@ void printEditorContents(void) {
     point startSel;
     point endSel;
     bool select = false;
-    if (I->anchor.r != -1) {
+    if (I->anchor.r != -1) { // selection mode
         startSel = minPoint(I->cursor, I->anchor);
         startSel.c = min(E->rowarray[startSel.r]->len - 1, startSel.c);
         endSel = maxPoint(I->cursor, I->anchor);
@@ -105,8 +116,7 @@ void printEditorContents(void) {
     // ITER OVER THE ROWS
     for (int r = I->toprow; visual_r < maxr && r < E->numrows; r++) {
         struct erow *curr_row = E->rowarray[r];
-        int visual_c = -1; // same as displayed col when modded by maxc and
-                           // adjusted by coloff
+        int visual_c = 0; // same as displayed col (starting at coloff)
 
         /* LINENUM DISPLAY */
         move(&ab, visual_r, 0);
@@ -146,56 +156,42 @@ void printEditorContents(void) {
                 select = false;
             }
 
-            char *to_add = curr_row->text + c;
+            char to_add = curr_row->text[c];
             int cwidth = 1;
-            if (*to_add == '\t') { // TODO abstract
-                cwidth = TAB_WIDTH - (c % TAB_WIDTH);
+            if (to_add == '\t') { // tabs are special
+                cwidth = TAB_WIDTH - (visual_c % TAB_WIDTH);
             }
-            visual_c += cwidth;
 
             /* SUBLINE HANDLING */
-            if (c != 0 && visual_c % maxc < cwidth) { // new subline?
+            if (c != 0 && visual_c + cwidth >= maxc) { // new subline?
                 abAppend(&ab, szstr("\x1b[m"));       // reset all formatting
-                visual_c +=
-                    cwidth - 1 -
-                    (visual_c % maxc); // (wide only) how many 'slots' skipped?
-                if (++visual_r >= maxr)
-                    break;
-                abAppend(
-                    &ab,
-                    szstr(
-                        "\x1b[0K")); // erase to end of line (needed for resize)
+                if (++visual_r >= maxr) break;
+                visual_c = 0;
+				// erase to EOL
+                abAppend(&ab, szstr("\x1b[0K"));
                 move(&ab, visual_r, I->coloff + 1); // move to upcoming subline
                 abAppend(&ab, szstr("\x1b[1K"));    // erase to start of line
                 if (select) {
-                    abAppend(&ab,
-                             szstr("\x1b[48;2;" SELECT_BG "m")); // start sel
+					// start sel
+                    abAppend(&ab, szstr("\x1b[48;2;" SELECT_BG "m"));
                 }
             }
+
+			visual_c += cwidth;
 
             /* CURSOR FINDING LOGIC */
             if (save_cursor.r == -1 && I->cursor.r == r) {
                 if (c == I->cursor.c) {
                     save_cursor.r = visual_r;
-                    save_cursor.c =
-                        (visual_c - cwidth + 1) % maxc + I->coloff + 1;
+                    save_cursor.c = visual_c - 1 + I->coloff + 1;
                 } else if (c == curr_row->len - 1) {
                     save_cursor.r = visual_r;
-                    save_cursor.c = (visual_c + 1) % maxc + I->coloff + 1;
+                    save_cursor.c = visual_c + I->coloff + 1;
                 }
-            }
+            }	
 
             /* WRITING CHARACTER */
-            // TODO abstract character substitution
-            if (*to_add == '\t') { // tab handling
-				int num_spaces = TAB_WIDTH - (c % TAB_WIDTH);
-				char* tab_string;
-				asprintf(&tab_string, "%*s", num_spaces, ""); // left pads the empty string
-                abAppend(&ab, tab_string, num_spaces);
-				free(tab_string);
-            } else {
-                abAppend(&ab, to_add, 1);
-            }
+			writeCharToBuffer(&ab, &to_add, visual_c - cwidth);
 
             /* END SELECTION HIGHLIGHTING */
             if (!select) {
