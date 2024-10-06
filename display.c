@@ -7,7 +7,7 @@
 #include "display.h"
 
 #define szstr(str) str, sizeof(str)
-
+#define TAB_WIDTH 4
 extern struct editorInterface *I;
 
 /* ======= ESC SEQUENCE UTILS ======= */
@@ -149,7 +149,7 @@ void printEditorContents(void) {
             char *to_add = curr_row->text + c;
             int cwidth = 1;
             if (*to_add == '\t') { // TODO abstract
-                cwidth = 4;
+                cwidth = TAB_WIDTH;
             }
             visual_c += cwidth;
 
@@ -187,8 +187,12 @@ void printEditorContents(void) {
 
             /* WRITING CHARACTER */
             // TODO abstract character substitution
-            if (*to_add == '\t') { // replace tabs with 4x spaces
-                abAppend(&ab, "    ", 4);
+            if (*to_add == '\t') { // tab handling
+				int num_spaces = TAB_WIDTH - (c % TAB_WIDTH);
+				char* tab_string;
+				asprintf(&tab_string, "%*s", num_spaces, ""); // left pads the empty string
+                abAppend(&ab, tab_string, num_spaces);
+				free(tab_string);
             } else {
                 abAppend(&ab, to_add, 1);
             }
