@@ -149,7 +149,7 @@ void printEditorContents(void) {
             char *to_add = curr_row->text + c;
             int cwidth = 1;
             if (*to_add == '\t') { // TODO abstract
-                cwidth = TAB_WIDTH;
+                cwidth = TAB_WIDTH - (c % TAB_WIDTH);
             }
             visual_c += cwidth;
 
