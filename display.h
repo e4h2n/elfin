@@ -6,10 +6,18 @@
 #include "editor.h"
 
 // RGB
-// color;style
-#define LINENUM_FG "246;193;119"
+#define FG "224;222;244"
+#define BG "35;33;54"
 
-#define SELECT_BG "68;65;90"
+#define CURSORLINE_FG "246;193;119"
+#define LINENUM_FG "144;140;170"
+
+#define STATUSLINE_A_BG "246;193;119"
+#define STATUSLINE_A_FG "42;40;62"
+#define STATUSLINE_BG "57;53;82"
+#define STATUSLINE_FG "246;193;119"
+
+#define SELECT_BG "86;82;110"
 
 typedef enum Mode { VIEW, INSERT, COMMAND, QUIT } Mode;
 

@@ -86,8 +86,18 @@ void writeCharToBuffer(struct abuf* ab, char* to_add, int visual_c) {
 	}
 }
 
+void setDefaultFG(struct abuf* ab) {
+	abAppend(ab, szstr("\x1b[38;2;" FG "m"));
+}
+
+void setDefaultBG(struct abuf* ab) {
+	abAppend(ab, szstr("\x1b[48;2;" BG "m"));
+}
+
 /* ======= DISPLAY ======= */
-void clearScreen(void) { write(STDIN_FILENO, szstr("\x1b[2J")); }
+void clearScreen(void) {
+	write(STDIN_FILENO, szstr("\x1b[2J"));
+}
 
 void printEditorContents(void) {
     int maxr = I->ws.ws_row;                 // height
@@ -100,6 +110,11 @@ void printEditorContents(void) {
     save_cursor.r = -1; // default not found
 
     struct abuf ab = {NULL, 0};        // buffer for the WHOLE screen
+	if (I->mode == VIEW || I->mode == COMMAND) { // cursor type
+		abAppend(&ab, szstr("\x1b[2 q"));
+	} else if (I->mode == INSERT) {
+		abAppend(&ab, szstr("\x1b[5 q"));
+	}
     abAppend(&ab, szstr("\x1b[?25l")); // hide cursor
 
     point startSel;
@@ -122,9 +137,17 @@ void printEditorContents(void) {
         move(&ab, visual_r, 0);
         char linenum[I->coloff];
         sprintf(linenum, "%*d ", I->coloff - 1, r + 1);
-        abAppend(&ab, szstr("\x1b[38;2;" LINENUM_FG "m")); // set FG color
+		if (I->cursor.r == r) { // set linenum fg color
+			abAppend(&ab, szstr("\x1b[1m")); // bold
+			abAppend(&ab, szstr("\x1b[38;2;" CURSORLINE_FG "m"));
+		} else {
+        	abAppend(&ab, szstr("\x1b[38;2;" LINENUM_FG "m"));
+		}
         abAppend(&ab, linenum, I->coloff);
         abAppend(&ab, szstr("\x1b[m")); // reset all formatting
+		setDefaultFG(&ab);
+		setDefaultBG(&ab);
+
         if (select) {
             abAppend(&ab, szstr("\x1b[48;2;" SELECT_BG "m")); // start sel
         }
@@ -136,7 +159,7 @@ void printEditorContents(void) {
             }
             abAppend(&ab, szstr(" "));
             if (endSel.r == r) {                  // end selection here
-                abAppend(&ab, szstr("\x1b[49m")); // end sel
+				setDefaultBG(&ab);
                 select = false;
             }
             if (I->cursor.r == r) { // cursor here
@@ -163,7 +186,7 @@ void printEditorContents(void) {
             }
 
             /* SUBLINE HANDLING */
-            if (c != 0 && visual_c + cwidth >= maxc) { // new subline?
+            if (visual_c + cwidth >= maxc) { // new subline?
                 abAppend(&ab, szstr("\x1b[m"));       // reset all formatting
                 if (++visual_r >= maxr) break;
                 visual_c = 0;
@@ -195,11 +218,11 @@ void printEditorContents(void) {
 
             /* END SELECTION HIGHLIGHTING */
             if (!select) {
-                abAppend(&ab, szstr("\x1b[49m")); // end sel
+				setDefaultBG(&ab);
             }
         }
         // prepare to start a new row
-        abAppend(&ab, szstr("\x1b[49m")); // end sel
+		setDefaultBG(&ab);
         abAppend(&ab, szstr("\x1b[0K"));  // erase to end of line
         visual_r++;
     }
@@ -210,7 +233,7 @@ void printEditorContents(void) {
         abAppend(&ab, szstr("\x1b[0K")); // erase to end of line
     }
 
-    abAppend(&ab, szstr("\x1b[49m")); // end selection, in case it was enabled
+    abAppend(&ab, szstr("\x1b[48;2;" BG "m")); // end selection, in case it was enabled
 
     // move the cursor to display position
     if (I->mode == COMMAND) {
@@ -229,16 +252,27 @@ void statusPrintMode(void) { // TODO rename this lol
         abAppend(&I->status, I->cmd.msg.text, I->cmd.msg.len);
         return;
     }
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_BG "m"));
+	abAppend(&I->status, szstr(""));
+	abAppend(&I->status, szstr("\x1b[48;2;" STATUSLINE_A_BG "m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_FG "m"));
+	abAppend(&I->status, szstr("\x1b[1m"));
     switch (I->mode) { // MODE
     case VIEW:
-        abAppend(&I->status, szstr("VIEW — "));
+        abAppend(&I->status, szstr("VIEW"));
         break;
     case INSERT:
-        abAppend(&I->status, szstr("INSERT — "));
+        abAppend(&I->status, szstr("INSERT"));
         break;
     default:
         break;
     }
+	abAppend(&I->status, szstr("\x1b[48;2;" STATUSLINE_BG "m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_BG "m"));
+	abAppend(&I->status, szstr(" "));
+	abAppend(&I->status, szstr("\x1b[0m"));
+	abAppend(&I->status, szstr("\x1b[48;2;" STATUSLINE_BG "m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_FG "m"));
     // filename
     abAppend(&I->status, I->filename, strlen(I->filename));
     // number of lines, number of bytes
@@ -247,14 +281,25 @@ void statusPrintMode(void) { // TODO rename this lol
     asprintf(&buf, " %dL", I->E->numrows);
     len = strlen(buf);
     abAppend(&I->status, buf, len);
+	abAppend(&I->status, szstr("\x1b[48;2;" BG" m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_BG "m"));
+	abAppend(&I->status, szstr(" "));
     abAppend(&I->status, szstr("\x1b[0K")); // erase to end of line
     free(buf);
     // cursor coordinates
-    asprintf(&buf, "%d, %d", I->cursor.r + 1,
-             I->cursor.c + 1); // asprintf my beloved
-    len = strlen(buf);
+    asprintf(&buf, "%d:%d", I->cursor.r + 1, I->cursor.c + 1);
+    len = strlen(buf) + 2;
     move(&I->status, I->ws.ws_row, I->ws.ws_col - len);
+	abAppend(&I->status, szstr("\x1b[1m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_BG "m"));
+	abAppend(&I->status, szstr(""));
+	abAppend(&I->status, szstr("\x1b[48;2;" STATUSLINE_A_BG "m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_FG "m"));
     abAppend(&I->status, buf, len);
+	abAppend(&I->status, szstr("\x1b[48;2;" BG "m"));
+	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_BG "m"));
+	abAppend(&I->status, szstr(""));
+	abAppend(&I->status, szstr("\x1b[m")); // reset all formatting
     free(buf);
 }
 

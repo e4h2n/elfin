@@ -36,9 +36,46 @@ struct editorInterface *I;          // THE editor used across all files
 static struct termios orig_termios; // restore at exit
 
 /* ======= terminal setup ======= */
+
+int countDigits(int n) {
+    // technically this says 0 has 0 digits
+    // but that's not a case we worry about
+    // we will always have at least one line
+    int out = 0;
+    while (n != 0) {
+        n /= 10;
+        out++;
+    }
+    return out;
+}
+
+void init_I(char* filename) {
+	I = malloc(sizeof(struct editorInterface));
+    I->filename = strdup(filename);
+    I->E = editorFromFile(I->filename);
+    I->toprow = 0;
+    I->mode = VIEW;
+    I->coloff = max(4, countDigits(I->E->numrows) + 2);
+    I->cursor.r = 0;
+    I->cursor.c = 0;
+    I->anchor.r = -1;
+    I->cmd.msg.text = strdup("");
+    I->cmdStack = NULL;
+    resize(0);
+}
+
+void destroy_I(void) {
+    destroyEditor(&I->E);
+    free(I->cmd.msg.text);
+    free(I->status.buf);
+	free(I->filename);
+    while (I->cmdStack != NULL) {
+        I->cmdStack = remove_node(I->cmdStack);
+    }
+    free(I);
+}
+
 void die(const char *s) {
-    clearScreen();
-    write(STDIN_FILENO, szstr("\x1b[?1049l")); // restore old buffer
     perror(s);
     exit(1);
 }
@@ -92,17 +129,8 @@ int readKey(void) {
 }
 
 void cleanup(void) {
-    destroyEditor(&I->E);
-    free(I->cmd.msg.text);
-    free(I->status.buf);
-    while (I->cmdStack != NULL) {
-        I->cmdStack = remove_node(I->cmdStack);
-    }
-    free(I);
-    // TODO FREE other stuff
-    clearScreen();
+	destroy_I();
     disableRawMode();
-    write(STDIN_FILENO, szstr("\x1b[?1049l")); // restore old buffer
 }
 
 /* ======= IO utils ======= */
@@ -374,6 +402,13 @@ void doUserCommand(struct erow cmd) {
         I->cursor = search(I->cursor, cmd.text + 1);
         I->anchor = I->cursor;
         I->anchor.c += cmd.len - 2;
+	} else if (!strncmp(cmd.text, ":e ", 3)) {
+		if (cmd.len > 3) {
+			char* text = strndup(cmd.text+3, cmd.len - 3);
+			destroy_I();
+			init_I(text);
+			free(text);
+		}
     } else if (!strncmp(cmd.text, ":w", cmd.len)) {
         editorSaveFile(I->E, I->filename);
     } else if (!strncmp(cmd.text, ":q", cmd.len)) {
@@ -428,45 +463,22 @@ void editorProcessKey(int c) {
     }
 }
 
-int countDigits(int n) {
-    // technically this says 0 has 0 digits
-    // but that's not a case we worry about
-    // we will always have at least one line
-    int out = 0;
-    while (n != 0) {
-        n /= 10;
-        out++;
-    }
-    return out;
-}
-
 /* ======= main ======= */
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("USAGE: elfin <filename>\n");
         return 0;
     }
-    /* editor init */
-    I = malloc(sizeof(struct editorInterface));
-    I->filename = argv[1];
-    I->E = editorFromFile(I->filename);
-    I->toprow = 0;
-    I->mode = VIEW;
-    I->coloff = max(4, countDigits(I->E->numrows) + 2);
-    I->cursor.r = 0;
-    I->cursor.c = 0;
-    I->anchor.r = -1;
-    I->cmd.msg.text = strdup("");
-    I->cmdStack = NULL;
-
+	
     /* terminal setup */
-    write(STDIN_FILENO, szstr("\x1b[?1049h")); // start alt buffer
+	write(STDIN_FILENO, szstr("\x1b[?1049h")); // start new buffer
     enableRawMode();
-    clearScreen();
 
     /* signal stuff */
     signal(SIGWINCH, resize);
-    resize(0);
+
+	/* editor init */
+	init_I(argv[1]);
 
     /* main IO loop */
     while (I->mode != QUIT) {
@@ -478,6 +490,8 @@ int main(int argc, char *argv[]) {
         printEditorContents();
         editorProcessKey(readKey());
     }
-    cleanup();
+
+	write(STDIN_FILENO, szstr("\x1b[?1049l")); // restore old buffer
+	cleanup();
     return 0;
 }
