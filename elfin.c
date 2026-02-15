@@ -60,6 +60,7 @@ void init_I(char* filename) {
     I->cursor.c = 0;
     I->anchor.r = -1;
     I->cmd.msg.text = strdup("");
+	I->status.buf = NULL;
     I->cmdStack = NULL;
     resize(0);
 }
@@ -311,6 +312,7 @@ void Insert(int c) {
             struct command *cmd = malloc(sizeof(struct command));
             cmd->type = NEWROW;
             cmd->at = I->cursor;
+			cmd->rows = NULL;
 
             I->cmdStack = push(cmd, I->cmdStack);
             doCommand(I->E, cmd);

@@ -47,8 +47,8 @@ void undoCommand(struct editor *E, struct command *cmd) {
 
 void freeCommand(struct command *cmd) {
     freeRowarr(cmd->rows, cmd->numrows);
-    free(cmd->rows);
-    free(cmd);
+    if (cmd->rows != NULL) free(cmd->rows);
+	free(cmd);
 }
 
 // removes(frees) the input commandStack (and associated command)

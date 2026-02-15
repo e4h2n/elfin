@@ -130,8 +130,8 @@ void printEditorContents(void) {
 
         /* LINENUM DISPLAY */
         move(&ab, visual_r, 0);
-        char linenum[I->coloff];
-        sprintf(linenum, "%*d ", I->coloff - 1, r + 1);
+        char* linenum;
+        asprintf(&linenum, "%*d ", I->coloff - 1, r + 1);
 		if (I->cursor.r == r) { // set linenum fg color
 			abAppend(&ab, szstr("\x1b[1m")); // bold
 			abAppend(&ab, szstr("\x1b[38;2;" CURSORLINE_FG "m"));

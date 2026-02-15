@@ -64,9 +64,9 @@ void insertChar(struct erow *row, int pos, char c) {
     assert(pos >= 0 && pos <= row->len);
 
     row->len++;
-    row->text = realloc(row->text, row->len + 1);
+    row->text = realloc(row->text, row->len+1);
 
-    memmove(row->text + pos + 1, row->text + pos, row->len - pos);
+    memmove(row->text + pos + 1, row->text + pos, row->len-1 - pos);
 
     row->text[pos] = c;
 }
@@ -88,7 +88,7 @@ void insertString(struct erow *row, int pos, char *str, int len) {
     int diff = str - row->text;
 
     row->len += len;
-    row->text = realloc(row->text, row->len);
+    row->text = realloc(row->text, row->len+1);
     if (overlaps) {
         str = row->text + diff;
     }
@@ -234,7 +234,7 @@ void insertRange(struct editor *E, point at, struct erow **rows, int numrows) {
     insertNewline(E, at.r, at.c);
     insertString(E->rowarray[at.r], at.c, rows[0]->text, rows[0]->len);
 
-    int shifted = E->numrows - at.r;
+    int shifted = E->numrows-1 - at.r;
     E->numrows += numrows - 2;
     E->rowarray = realloc(E->rowarray, E->numrows * sizeof(struct erow *));
     memmove(E->rowarray + at.r + numrows - 1, E->rowarray + at.r + 1,
@@ -243,11 +243,12 @@ void insertRange(struct editor *E, point at, struct erow **rows, int numrows) {
     for (int i = 1; i < numrows - 1; i++) {
         E->rowarray[at.r + i] = malloc(sizeof(struct erow));
         E->rowarray[at.r + i]->len = 0;
+        E->rowarray[at.r + i]->text = NULL;
         insertString(E->rowarray[at.r + i], 0, rows[i]->text, rows[i]->len);
     }
 
     insertString(E->rowarray[at.r + numrows - 1], 0, rows[numrows - 1]->text,
-                 rows[numrows - 1]->len);
+                rows[numrows - 1]->len);
 }
 
 void copyToClipboard(struct editor *E, point start, point end) {
@@ -262,6 +263,8 @@ struct editor *editorFromFile(char *filename) {
     struct editor *E = malloc(sizeof(struct editor));
     E->numrows = 0;
     E->rowarray = NULL;
+	E->clipboard_len = 0;
+	E->clipboard = NULL;
     FILE *fp = fopen(filename, "r");
     newRow(E, 0);
     if (!fp) { // NEW FILE
