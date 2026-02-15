@@ -263,12 +263,10 @@ void View(int c) {
         break;
     case 'G':
         I->cursor.r = I->E->numrows - 1;
-        I->cursor.c = max(0, I->E->rowarray[I->cursor.r]->len - 1);
         break;
     case 'g':
         if (readKey() == 'g') {
             I->cursor.r = 0;
-            I->cursor.c = 0;
         }
         break;
     case 'u':
