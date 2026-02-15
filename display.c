@@ -42,25 +42,20 @@ point getBoundedCursor(void) {
     return out;
 }
 
-point getLargestDisplayedPoint(
-    void) { // TODO technically doesn't work because of wide chars
+point getLargestDisplayedPoint(void) {
     int maxr = I->ws.ws_row;
-    int maxc = I->ws.ws_col - I->coloff - 1;
+    int maxc = I->ws.ws_col - I->coloff - 2;
     struct editor *E = I->E;
 
-    int visual_r = 1;
-
-    int r;
-    int len;
-    for (r = I->toprow; r < E->numrows && visual_r < maxr; r++) {
-        len = E->rowarray[r]->len;
-        visual_r += len / maxc + (len % maxc != 0) + (len == 0);
-    }
-    int extra = max(visual_r - maxr, 0);
-    if (extra != 0) {
-        len -= len % maxc - (extra - 1) * maxc;
-    }
-    point out = {r - 1, len};
+    int r = I->toprow;
+	int c = 0;
+	for(int visual_r = 1; r < E->numrows && visual_r < maxr; visual_r++) {
+		if (E->rowarray[r]->len <= (c += maxc)) {
+			c = 0;
+			r++;
+		}
+	}
+    point out = {r, c};
     return out;
 }
 
@@ -69,7 +64,7 @@ void adjustToprow(void) {
         I->toprow = I->cursor.r;
         return;
     }
-    while (pointGreater(getBoundedCursor(), getLargestDisplayedPoint())) {
+    while (!pointLess(getBoundedCursor(), getLargestDisplayedPoint())) {
         I->toprow++;
     }
 }
@@ -91,7 +86,7 @@ void setDefaultFG(struct abuf* ab) {
 }
 
 void setDefaultBG(struct abuf* ab) {
-	abAppend(ab, szstr("\x1b[48;2;" BG "m"));
+	abAppend(ab, szstr("\x1b[49m"));
 }
 
 /* ======= DISPLAY ======= */
@@ -249,6 +244,7 @@ void printEditorContents(void) {
 
 void statusPrintMode(void) { // TODO rename this lol
     if (I->mode == COMMAND) {
+		abAppend(&I->status, szstr("\x1b[48;2;" STATUSLINE_BG "m"));
         abAppend(&I->status, I->cmd.msg.text, I->cmd.msg.len);
         return;
     }
@@ -296,7 +292,7 @@ void statusPrintMode(void) { // TODO rename this lol
 	abAppend(&I->status, szstr("\x1b[48;2;" STATUSLINE_A_BG "m"));
 	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_FG "m"));
     abAppend(&I->status, buf, len);
-	abAppend(&I->status, szstr("\x1b[48;2;" BG "m"));
+	setDefaultBG(&I->status);
 	abAppend(&I->status, szstr("\x1b[38;2;" STATUSLINE_A_BG "m"));
 	abAppend(&I->status, szstr(""));
 	abAppend(&I->status, szstr("\x1b[m")); // reset all formatting
