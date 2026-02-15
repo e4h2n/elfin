@@ -78,7 +78,7 @@ void writeCharToBuffer(struct abuf* ab, char* to_add, int visual_c) {
 	if (*to_add == '\t') { // tab handling
 		int num_spaces = TAB_WIDTH - (visual_c % TAB_WIDTH);
 		char* tab_string;
-		asprintf(&tab_string, "%*s", num_spaces, ""); // left pads the empty string
+		asprintf(&tab_string, "%*s", num_spaces, " "); // left pads the empty string
 		abAppend(ab, tab_string, num_spaces);
 		free(tab_string);
 	} else {
