@@ -3,7 +3,6 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-#include <assert.h>
 #include "display.h"
 
 #define szstr(str) str, sizeof(str)
